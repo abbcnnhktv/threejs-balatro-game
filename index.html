@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <title>Neon Joker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <canvas id="scene"></canvas>
+
+    <aside id="sidebar">
+      <div id="blind-panel" class="panel">
+        <div id="blind-name" class="blind-name">Neon Joker</div>
+        <div id="blind-desc" class="blind-desc"></div>
+        <div class="target-row">
+          <span>Score at least</span>
+          <b id="target">–</b>
+          <span id="reward" class="reward"></span>
+        </div>
+      </div>
+
+      <div class="panel score-panel">
+        <span class="label">Round score</span>
+        <div id="round-score">0</div>
+      </div>
+
+      <div class="panel hand-panel">
+        <div id="hand-name">&nbsp;</div>
+        <div class="cm">
+          <div id="chips" class="chips">0</div>
+          <span class="x">×</span>
+          <div id="mult" class="mult">0</div>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><span class="label">Hands</span><b id="hands" class="blue">4</b></div>
+        <div class="stat"><span class="label">Discards</span><b id="discards" class="red">3</b></div>
+        <div class="stat wide"><b id="money" class="gold">$4</b></div>
+        <div class="stat"><span class="label">Ante</span><b id="ante">1/8</b></div>
+        <div class="stat"><span class="label">Round</span><b id="round">0</b></div>
+      </div>
+
+      <div class="side-buttons">
+        <button id="btn-info" class="btn small">Run Info</button>
+        <button id="btn-mute" class="btn small" title="Toggle sound">🔊</button>
+      </div>
+    </aside>
+
+    <div id="controls" class="hidden">
+      <button id="btn-play" class="btn blue">Play Hand</button>
+      <div class="sort">
+        <span>Sort Hand</span>
+        <div>
+          <button id="btn-sort-rank" class="btn tiny orange">Rank</button>
+          <button id="btn-sort-suit" class="btn tiny orange">Suit</button>
+        </div>
+      </div>
+      <button id="btn-discard" class="btn red">Discard</button>
+    </div>
+
+    <div id="labels"></div>
+    <div id="tooltip" class="tooltip hidden"></div>
+    <div id="overlay" class="hidden"></div>
+    <div id="loading">Shuffling…</div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
