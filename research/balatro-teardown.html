@@ -1,0 +1,788 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Balatro Teardown</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: one reading column (~68ch) with full-bleed figure rows; chips-blue / mult-red are the page's two accents, taken straight from the game's scoring UI. */
+:root {
+  --bg: #eef1ee;
+  --surface: #fafbf9;
+  --surface-2: #e3e8e4;
+  --ink: #14201b;
+  --muted: #56635d;
+  --line: #c9d1cc;
+  --chips: #1f6fd6;
+  --mult: #d9382f;
+  --money: #9a6b00;
+  --felt: #1d5c46;
+  --chip-ink: #ffffff;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a;
+  --font-display: "Bricolage Grotesque", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1513; --surface: #17201c; --surface-2: #1f2a25; --ink: #eaf0ec; --muted: #9eaba5; --line: #2e3b35;
+    --chips: #4d93ef; --mult: #ff5d55; --money: #f0b43a; --felt: #47a882; --chip-ink: #0b0f0d;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1513; --surface: #17201c; --surface-2: #1f2a25; --ink: #eaf0ec; --muted: #9eaba5; --line: #2e3b35;
+  --chips: #4d93ef; --mult: #ff5d55; --money: #f0b43a; --felt: #47a882; --chip-ink: #0b0f0d;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 18px;
+  line-height: 1.6;
+  padding-inline: 20px;
+  padding-block: 0 80px;
+}
+.wrap { max-width: 1080px; margin: 0 auto; }
+.col { max-width: 68ch; }
+h1, h2, h3, h4 { font-family: var(--font-display); line-height: 1.1; text-wrap: balance; margin: 0; }
+h2 { font-size: clamp(30px, 4.2vw, 44px); font-weight: 800; letter-spacing: -0.01em; }
+h3 { font-size: 22px; font-weight: 800; }
+h4 { font-size: 17px; font-weight: 800; }
+p { margin: 0; }
+a { color: var(--chips); }
+.eyebrow {
+  font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--felt);
+}
+.mono, .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.chips-t { color: var(--chips); font-weight: 600; }
+.mult-t { color: var(--mult); font-weight: 600; }
+.money-t { color: var(--money); font-weight: 600; }
+
+/* hero */
+header.hero { padding-block: 56px 36px; display: grid; gap: 22px; }
+.hero h1 { font-size: clamp(48px, 9vw, 104px); font-weight: 800; letter-spacing: -0.03em; }
+.hero .lede { font-size: 21px; max-width: 60ch; }
+.equation {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+  font-family: var(--font-mono); font-weight: 700; font-size: clamp(22px, 4vw, 40px);
+}
+.tok { padding: 6px 16px 8px; border-radius: 10px; color: var(--chip-ink); font-variant-numeric: tabular-nums; }
+.tok.c { background: var(--chips); }
+.tok.m { background: var(--mult); }
+.equation .op { color: var(--muted); }
+.equation .total { color: var(--ink); }
+.facts { display: flex; flex-wrap: wrap; gap: 10px 28px; font-size: 15px; color: var(--muted); }
+.facts b { font-family: var(--font-mono); color: var(--ink); font-weight: 700; }
+
+nav.toc { display: flex; flex-wrap: wrap; gap: 8px; padding-block: 10px 6px; border-top: 1px solid var(--line); }
+nav.toc a {
+  font-family: var(--font-mono); font-size: 13px; text-decoration: none; color: var(--ink);
+  padding: 4px 10px; border-radius: 999px; background: var(--surface-2);
+}
+nav.toc a:hover, nav.toc a:focus-visible { background: var(--felt); color: var(--surface); outline: none; }
+
+section { padding-block: 64px 0; display: grid; gap: 22px; scroll-margin-top: 12px; }
+section > .col { display: grid; gap: 16px; }
+
+.answer {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 22px 24px;
+  display: grid; gap: 12px;
+}
+.answer p { font-size: 20px; }
+
+/* grids */
+.grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.grid > * { min-width: 0; }
+.cell { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; display: grid; gap: 8px; align-content: start; }
+.cell p { font-size: 16px; }
+.cell .tag { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+
+/* loops ladder */
+.ladder { display: grid; gap: 0; border-left: 3px solid var(--felt); }
+.rung { display: grid; grid-template-columns: 150px 1fr; gap: 16px; padding: 12px 0 12px 18px; border-bottom: 1px dashed var(--line); }
+.rung:last-child { border-bottom: 0; }
+.rung .t { font-family: var(--font-mono); font-size: 14px; color: var(--felt); font-weight: 700; }
+.rung p { font-size: 16px; }
+@media (max-width: 560px) { .rung { grid-template-columns: 1fr; gap: 4px; } }
+
+/* tables */
+.tablebox { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+table { border-collapse: collapse; width: 100%; font-size: 15px; }
+th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+td.n, th.n { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+tr:last-child td { border-bottom: 0; }
+td.wrap { white-space: normal; min-width: 220px; }
+
+/* charts */
+figure { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px 18px 12px; display: grid; gap: 10px; }
+figcaption { display: grid; gap: 4px; }
+figcaption h4 { font-size: 18px; }
+figcaption p { font-size: 15px; color: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-family: var(--font-mono); font-size: 13px; color: var(--ink); }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.legend i { width: 14px; height: 4px; border-radius: 2px; display: inline-block; }
+.legend i.sq { height: 12px; width: 12px; border-radius: 3px; }
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { font-family: var(--font-mono); font-size: 11px; fill: var(--muted); }
+.chart .lbl { fill: var(--ink); font-size: 12px; font-weight: 700; }
+.tip {
+  position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); font-family: var(--font-mono); font-size: 12px;
+  padding: 8px 10px; border-radius: 8px; line-height: 1.5; white-space: nowrap; transform: translate(-50%, calc(-100% - 12px)); z-index: 2;
+}
+.tip b { font-weight: 700; }
+.model-note { font-family: var(--font-mono); font-size: 12px; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 8px; }
+
+/* calculator */
+.calc { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; display: grid; gap: 18px; }
+.calc .controls { align-items: end; display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.calc label { display: grid; gap: 6px; font-family: var(--font-mono); font-size: 13px; color: var(--muted); }
+.calc select, .calc input[type=range] { width: 100%; }
+.calc select { font: inherit; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+.calc output { color: var(--ink); font-weight: 700; }
+.calc .result { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-family: var(--font-mono); font-weight: 700; font-size: clamp(20px, 3.4vw, 30px); }
+.antes { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
+.ante { border-radius: 8px; padding: 8px 4px; text-align: center; font-family: var(--font-mono); font-size: 12px; background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); }
+.ante b { display: block; font-size: 15px; }
+.ante.ok { background: var(--felt); color: var(--surface); border-color: var(--felt); }
+.ante.close { border: 2px solid var(--money); color: var(--ink); }
+@media (max-width: 560px) { .antes { grid-template-columns: repeat(4, 1fr); } }
+
+/* phase timeline */
+.phases { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); }
+.phase { padding: 16px; background: var(--surface); display: grid; gap: 6px; align-content: start; border-right: 1px solid var(--line); min-width: 0; }
+.phase:last-child { border-right: 0; }
+.phase .when { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.phase p { font-size: 15px; }
+.heat { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.heat i { display: block; height: 100%; background: var(--mult); }
+
+/* proposals */
+.prop { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; display: grid; gap: 10px; }
+.prop .head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.prop .kind { font-family: var(--font-mono); font-size: 12px; padding: 2px 8px; border-radius: 6px; background: var(--surface-2); color: var(--ink); }
+.prop dl { display: grid; grid-template-columns: 110px 1fr; gap: 6px 14px; margin: 0; font-size: 16px; }
+.prop dt { font-family: var(--font-mono); font-size: 12px; color: var(--muted); padding-top: 4px; text-transform: uppercase; letter-spacing: 0.06em; }
+.prop dd { margin: 0; min-width: 0; }
+@media (max-width: 560px) { .prop dl { grid-template-columns: 1fr; } .prop dt { padding-top: 6px; } }
+.props { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); }
+
+.matrix td:first-child { font-weight: 600; }
+.pill { font-family: var(--font-mono); font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 700; }
+.pill.keep { background: var(--felt); color: var(--surface); }
+.pill.change { background: var(--money); color: var(--surface); }
+.pill.add { background: var(--chips); color: var(--chip-ink); }
+
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+ul.plain li { padding-left: 4px; }
+.sources { font-size: 15px; }
+footer { padding-block: 60px 0; font-size: 14px; color: var(--muted); }
+
+:focus-visible { outline: 2px solid var(--chips); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+
+<header class="hero">
+  <span class="eyebrow">Game design teardown · for the Neon Joker project</span>
+  <h1>Balatro Teardown</h1>
+  <p class="lede">How a solo-developed poker roguelike turns chips, mult and a $25 savings account into one of the stickiest loops in games, and what a 3D successor should keep, replace and add.</p>
+  <div class="equation" aria-label="Chips times Mult equals score">
+    <span class="tok c" id="eqC">120</span><span class="op">×</span><span class="tok m" id="eqM">48</span><span class="op">=</span><span class="total" id="eqT">5,760</span>
+  </div>
+  <div class="facts">
+    <span>Released <b>20 Feb 2024</b></span>
+    <span>Developer <b>LocalThunk</b> (solo)</span>
+    <span>Sales <b>5M+</b> by Jan 2025</span>
+    <span>The Game Awards 2024 <b>3 wins</b></span>
+  </div>
+  <nav class="toc" aria-label="Contents">
+    <a href="#answer">Short answer</a><a href="#loops">Loops</a><a href="#math">Game math</a><a href="#curve">Difficulty curve</a>
+    <a href="#scissors">Almost-won</a><a href="#economy">Economy</a><a href="#psych">Why it hooks</a><a href="#gaps">Weak spots</a>
+    <a href="#ideas">Innovations</a><a href="#matrix">Keep / change / add</a><a href="#tuning">Tuning targets</a><a href="#sources">Sources</a>
+  </nav>
+</header>
+
+<!-- ───────── 1 ───────── -->
+<section id="answer">
+  <div class="col">
+    <span class="eyebrow">The short answer</span>
+    <h2>Every hand is a tiny experiment with a number you can read</h2>
+  </div>
+  <div class="answer col">
+    <p>Balatro is fun because it makes <b>exponential growth legible</b>. Every hand shows its math one card at a time (<span class="chips-t">chips</span> × <span class="mult-t">mult</span>), and the target the game demands grows about 167× from ante 1 to ante 8. Additive bonuses cannot keep up, so the player is forced to discover multiplicative synergies.</p>
+    <p>It keeps you coming back because a run is short (30 to 60 minutes), the randomness happens <i>before</i> you decide, and the most common failure is a run that was visibly close. A loss reads as "I picked the wrong joker on ante 4", and that thought turns straight into "one more run".</p>
+  </div>
+</section>
+
+<!-- ───────── 2 ───────── -->
+<section id="loops">
+  <div class="col">
+    <span class="eyebrow">Structure</span>
+    <h2>Five nested loops, each with its own payoff</h2>
+    <p>Most games have one or two reward loops. Balatro stacks five. Each runs on a different time scale, so there is always a payoff a few seconds, a few minutes and a few days away.</p>
+  </div>
+  <div class="ladder col">
+    <div class="rung"><span class="t">~10 seconds<br>Hand</span><p>Select up to 5 cards, play or discard. The scoring animation counts every card and joker with rising pitch. <b>Payoff:</b> a number that is bigger than you expected.</p></div>
+    <div class="rung"><span class="t">2–4 minutes<br>Blind</span><p>Beat a score target with 4 hands and 3 discards. <b>Payoff:</b> crossing the target line, cash-out screen, money ticking up.</p></div>
+    <div class="rung"><span class="t">~8–12 minutes<br>Ante</span><p>Small Blind, Big Blind, Boss Blind, with a shop after each. <b>Payoff:</b> buying the joker that completes your engine. Bosses test whether the engine has a hole.</p></div>
+    <div class="rung"><span class="t">30–60 minutes<br>Run</span><p>Eight antes to win, endless mode after. <b>Payoff:</b> a build with a name and an identity ("the Baron/Mime steel-king deck").</p></div>
+    <div class="rung"><span class="t">Weeks<br>Meta</span><p>150 jokers to discover, 15 decks × 8 stakes of completion stickers, challenges. <b>Payoff:</b> new tools and harder goals, never permanent power. What carries over between runs is knowledge.</p></div>
+  </div>
+</section>
+
+<!-- ───────── 3 ───────── -->
+<section id="math">
+  <div class="col">
+    <span class="eyebrow">Game math</span>
+    <h2>Two numbers, three kinds of bonus</h2>
+    <p>Score = <span class="chips-t">Chips</span> × <span class="mult-t">Mult</span>. The hand type sets the base values. Scored cards add their face value to chips (2–10 at face, J/Q/K 10, A 11). Jokers then fire left to right, and the order matters because bonuses come in three strengths:</p>
+  </div>
+  <div class="grid">
+    <div class="cell"><span class="tag">ADDITIVE · CHIPS</span><h4 class="chips-t">+Chips</h4><p>Raises the left factor. Weakest on its own, because it is multiplied by a small mult.</p></div>
+    <div class="cell"><span class="tag">ADDITIVE · MULT</span><h4 class="mult-t">+Mult</h4><p>Raises the right factor. Better than +chips early, but still grows linearly.</p></div>
+    <div class="cell"><span class="tag">MULTIPLICATIVE</span><h4 class="mult-t">×Mult</h4><p>Multiplies everything before it. Two ×2 jokers quadruple the score, so position in the joker row is a real decision.</p></div>
+  </div>
+  <div class="col"><p>The whole skill ceiling sits in that ordering: add first, multiply last. Players learn it by watching the numbers, not from a tutorial, and the moment it clicks feels like discovering a secret.</p></div>
+
+  <div class="tablebox">
+    <table>
+      <thead><tr><th>Hand</th><th class="n">Base chips</th><th class="n">Base mult</th><th class="n">Per level</th><th class="n">Lvl 1 score*</th><th>Note</th></tr></thead>
+      <tbody id="handRows"></tbody>
+    </table>
+  </div>
+  <p class="muted col" style="font-size:14px">*Base chips × base mult before any card chips. Planet cards add the "per level" values. The last three hands only exist once you add duplicate cards to your deck, so they are rewards for deck manipulation.</p>
+
+  <div class="calc" aria-labelledby="calcTitle">
+    <div style="display:grid;gap:4px">
+      <h3 id="calcTitle">Try it: build one hand</h3>
+      <p class="muted" style="font-size:15px">Move the sliders and watch how far one hand carries you. A cell turns green when this hand alone clears that ante's Boss Blind (White Stake) within 4 hands. A gold outline means you are close (60–100% of the way).</p>
+    </div>
+    <div class="controls">
+      <label for="cHand">Hand type<select id="cHand"></select></label>
+      <label for="cLvl">Hand level <output id="oLvl">1</output><input id="cLvl" type="range" min="1" max="12" value="1"></label>
+      <label for="cChips">+Chips from cards &amp; jokers <output id="oChips">30</output><input id="cChips" type="range" min="0" max="600" step="10" value="30"></label>
+      <label for="cMult">+Mult from jokers <output id="oMult">4</output><input id="cMult" type="range" min="0" max="120" step="2" value="4"></label>
+      <label for="cX">×1.5 jokers owned <output id="oX">0</output><input id="cX" type="range" min="0" max="6" value="0"></label>
+    </div>
+    <div class="result" aria-live="polite">
+      <span class="tok c" id="rC">0</span><span class="muted">×</span><span class="tok m" id="rM">0</span><span class="muted">=</span><span id="rT">0</span>
+    </div>
+    <div class="antes" id="anteCells"></div>
+  </div>
+</section>
+
+<!-- ───────── 4 ───────── -->
+<section id="curve">
+  <div class="col">
+    <span class="eyebrow">Difficulty curve</span>
+    <h2>The target grows about 167× over eight antes</h2>
+    <p>Each ante has three blinds. The Small Blind asks for 1× the ante's base score, the Big Blind 1.5×, the Boss 2× (The Wall asks for 4×, the ante-8 Violet Vessel for 6×). Higher stakes steepen the curve, so the same skills have to produce more.</p>
+  </div>
+  <figure>
+    <figcaption><h4>Base score required per ante, by stake</h4><p>Log scale: each gridline is 10× the one below. Hover for values.</p></figcaption>
+    <div class="legend" id="lgCurve"></div>
+    <div class="chart" id="chCurve"></div>
+  </figure>
+  <div class="tablebox">
+    <table>
+      <thead><tr><th>Ante</th><th class="n">White</th><th class="n">× vs prev</th><th class="n">Green</th><th class="n">Purple</th><th class="n">White boss (2×)</th></tr></thead>
+      <tbody id="curveRows"></tbody>
+    </table>
+  </div>
+  <div class="col">
+    <p>Read the growth column. On White Stake the step-to-step factor <b>shrinks</b> from 2.7× to 1.4×, yet the absolute jump keeps widening (ante 7 to 8 adds 15,000 points). Early antes teach the rules. Antes 4–6 are the real filter, because that is where an additive build stops scaling. Ante 8 ends on a "finisher" boss designed to punish one specific weakness.</p>
+  </div>
+  <div class="grid">
+    <div class="cell"><span class="tag">BOSS AS EXAM</span><h4>Each boss checks one assumption</h4><p>The Psychic (must play 5 cards), The Eye (no repeated hand types), The Plant (face cards debuffed), The Needle (one hand). Each punishes a build that leans on one trick.</p></div>
+    <div class="cell"><span class="tag">INFORMATION</span><h4>The boss is shown in advance</h4><p>You see the boss at the start of the ante and can shop around it. The difficulty is a planning problem, not an ambush.</p></div>
+    <div class="cell"><span class="tag">STAKE LADDER</span><h4>8 stakes, cumulative modifiers</h4><p>Red: Small Blind pays no reward. Green: faster scaling. Black: Eternal jokers. Blue: −1 discard. Purple: faster scaling. Orange: Perishable jokers. Gold: Rental jokers.</p></div>
+    <div class="cell"><span class="tag">ENDLESS</span><h4>A deliberate wall</h4><p>After ante 8 the targets explode: hundreds of thousands at ante 9–10, then hundreds of millions by ante 12, eventually overflowing the game's number type ("naneinf"). Endless is a sandbox for absurd builds, not a balanced mode.</p></div>
+  </div>
+</section>
+
+<!-- ───────── 5 ───────── -->
+<section id="scissors">
+  <div class="col">
+    <span class="eyebrow">The "almost won" engine</span>
+    <h2>Why most losses feel like near-misses</h2>
+    <p>Put a typical additive build next to the requirement and the two curves form a pair of scissors. Linear bonuses carry you through the first three or four antes on autopilot. Then the requirement pulls away while you are still close enough to see the finish. The player loses at ante 5 or 6 with a run that "nearly worked".</p>
+  </div>
+  <figure>
+    <figcaption><h4>Per-hand score needed vs. two build archetypes</h4><p>Needed = Boss target ÷ 3 hands (White Stake). Hover to compare.</p></figcaption>
+    <div class="legend" id="lgScissors"></div>
+    <div class="chart" id="chScissors"></div>
+    <p class="model-note">Illustrative model, not game data. Additive build: chips 40+25·ante, mult 3+5·ante. Engine build: same, plus ×1.4 per ante from ante 4 onward (one ×mult source added each ante). The two builds are identical through ante 3, so their lines overlap there.</p>
+  </figure>
+  <div class="phases" role="list">
+    <div class="phase" role="listitem"><span class="when">ANTES 1–2</span><h4>Confidence</h4><div class="heat"><i style="width:15%"></i></div><p>Almost any pair clears the blind. You feel smart, explore jokers and bank interest.</p></div>
+    <div class="phase" role="listitem"><span class="when">ANTES 3–4</span><h4>Commitment</h4><div class="heat"><i style="width:40%"></i></div><p>You pick a hand type and level it with planets. Every shop is now a bet on that identity.</p></div>
+    <div class="phase" role="listitem"><span class="when">ANTES 5–6</span><h4>The squeeze</h4><div class="heat"><i style="width:75%"></i></div><p>Additive builds fall a third or more short. You need a ×mult joker now, and the shop may not have one.</p></div>
+    <div class="phase" role="listitem"><span class="when">ANTES 7–8</span><h4>The final exam</h4><div class="heat"><i style="width:100%"></i></div><p>The score bar fills to 80, 90, 97%… and the finisher boss decides it. Win or lose, you saw exactly how far you got.</p></div>
+  </div>
+  <div class="grid">
+    <div class="cell"><span class="tag">MECHANISM 1</span><h4>Precise gap display</h4><p>The target and your score sit side by side, in exact digits. "Short by 1,840" is far more motivating than "you died".</p></div>
+    <div class="cell"><span class="tag">MECHANISM 2</span><h4>Late, expensive failure</h4><p>Runs usually end after 30+ minutes of building, so the player has a full story of choices to replay in their head.</p></div>
+    <div class="cell"><span class="tag">MECHANISM 3</span><h4>Self-attributed loss</h4><p>Randomness is resolved before decisions (you see the hand, then choose). Losses trace back to a choice, and a choice can be made better next time.</p></div>
+    <div class="cell"><span class="tag">MECHANISM 4</span><h4>Cheap restart</h4><p>One click starts a new seed with a new first shop. The cost of trying again is near zero, and the next run could start with the joker you missed.</p></div>
+  </div>
+</section>
+
+<!-- ───────── 6 ───────── -->
+<section id="economy">
+  <div class="col">
+    <span class="eyebrow">Economy</span>
+    <h2>Money is the second score</h2>
+    <p>You start with <span class="money-t">$4</span>. Blinds pay <span class="money-t">$3 / $4 / $5</span>, each unused hand pays <span class="money-t">$1</span>, and interest pays <span class="money-t">$1 per $5 held</span>, capped at <span class="money-t">$5</span> a round when you hold $25. That cap is the most important number in the economy. It turns every shop into a three-way choice between buying power now, saving for interest and rerolling for variance.</p>
+  </div>
+  <figure>
+    <figcaption><h4>Income per ante: spender vs. saver</h4><p>Saving to $25 nearly doubles income. Hover segments for values.</p></figcaption>
+    <div class="legend" id="lgEcon"></div>
+    <div class="chart" id="chEcon"></div>
+    <p class="model-note">Model: 3 blinds per ante pay $12; one unused hand per blind ($3); spender averages $5 held ($1 interest per round), saver holds $25+ ($5 per round).</p>
+  </figure>
+  <div class="tablebox">
+    <table>
+      <thead><tr><th>Shop item</th><th class="n">Typical price</th><th>What it buys you</th></tr></thead>
+      <tbody>
+        <tr><td>Common joker</td><td class="n">$2–5</td><td class="wrap">Mostly +chips / +mult; the backbone of early antes.</td></tr>
+        <tr><td>Uncommon joker</td><td class="n">$5–8</td><td class="wrap">Conditional scaling and economy effects.</td></tr>
+        <tr><td>Rare joker</td><td class="n">$8–10</td><td class="wrap">×mult engines, retriggers, copy effects (Blueprint).</td></tr>
+        <tr><td>Booster pack</td><td class="n">$4 / $6 / $8</td><td class="wrap">Choose 1 of 3–5 cards: a slot-machine moment with a decision attached.</td></tr>
+        <tr><td>Voucher (1 per ante)</td><td class="n">$10</td><td class="wrap">Permanent run upgrades: +1 shop slot, +hand size, +interest cap.</td></tr>
+        <tr><td>Reroll</td><td class="n">$5, +$1 each</td><td class="wrap">Pay for another look; the price rises within a shop and resets next shop.</td></tr>
+        <tr><td>Selling a joker</td><td class="n">½ cost</td><td class="wrap">An exit, so a bad pick is not permanent.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="col"><p>The economy works because the <b>hold-or-spend</b> tension appears in every shop, and because skipping a blind trades its money for a Tag (a free pack or a coupon). Players who learn to sit at $25 while still buying the one joker they need are visibly better, and the game makes that skill feel earned.</p></div>
+</section>
+
+<!-- ───────── 7 ───────── -->
+<section id="psych">
+  <div class="col">
+    <span class="eyebrow">Player psychology</span>
+    <h2>Why it is hard to put down</h2>
+    <p>None of these hooks needs real money. Balatro has no microtransactions; it was still briefly rated PEGI 18 for "gambling imagery" before an appeal lowered it. The pull comes from structure and feedback, which is what we want to copy.</p>
+  </div>
+  <div class="tablebox">
+    <table>
+      <thead><tr><th>Hook</th><th>How Balatro does it</th><th>Our takeaway</th></tr></thead>
+      <tbody>
+        <tr><td>Number go up</td><td class="wrap">Scores climb from hundreds to millions in one run; scientific notation becomes a trophy.</td><td class="wrap">Make growth visible and physical, and keep it readable at the top end.</td></tr>
+        <tr><td>Juice</td><td class="wrap">Every chip pops with a rising pitch, cards wobble, the score catches fire when it beats the blind.</td><td class="wrap">Feedback scales with the size of the event. Small hands tick; huge hands shake the table.</td></tr>
+        <tr><td>Input randomness</td><td class="wrap">You draw first, then decide. The dice are rolled before you act, not after.</td><td class="wrap">Keep luck in what you are offered, never in whether your chosen action works.</td></tr>
+        <tr><td>Variable rewards</td><td class="wrap">Packs and shops can roll a rare, a Negative edition or The Soul. The cadence feels like a slot machine but always ends in a choice.</td><td class="wrap">Every random reveal must end in a decision.</td></tr>
+        <tr><td>Discovery</td><td class="wrap">150 jokers with emergent combos the designer did not script; players share builds online.</td><td class="wrap">Design jokers as verbs that combine, not as stat sticks.</td></tr>
+        <tr><td>Familiar grammar</td><td class="wrap">Everyone knows a flush beats a pair. The barrier to the first hand is zero.</td><td class="wrap">Borrow a grammar people already know; put the novelty in the modifiers.</td></tr>
+        <tr><td>Short, complete sessions</td><td class="wrap">A blind is a natural stopping point, but there is always a shop right after it.</td><td class="wrap">Every break point should come with a reason to stay.</td></tr>
+        <tr><td>Knowledge as progression</td><td class="wrap">No permanent power-ups; unlocks widen options, and the player gets better.</td><td class="wrap">Meta-progression adds options, never stats, so wins stay earned.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ───────── 8 ───────── -->
+<section id="gaps">
+  <div class="col">
+    <span class="eyebrow">Opportunities</span>
+    <h2>Where Balatro leaves room</h2>
+    <p>These are the friction points players most often raise about Balatro. Each is a gap our game can fill.</p>
+  </div>
+  <div class="grid">
+    <div class="cell"><span class="tag">PACING</span><h4>Ante 1–2 are often trivial</h4><p>The first ten minutes rarely involve tension, and an overkill score is wasted.</p></div>
+    <div class="cell"><span class="tag">VARIANCE</span><h4>Feast-or-famine shops</h4><p>A run can die because no ×mult joker appeared by ante 5, with nothing the player could do about it.</p></div>
+    <div class="cell"><span class="tag">ISOLATED HANDS</span><h4>Hands rarely connect</h4><p>Each hand is scored alone; there is little reason to plan a sequence across a blind.</p></div>
+    <div class="cell"><span class="tag">FEEL-BAD BOSSES</span><h4>Some bosses just say no</h4><p>The Needle or The Psychic can end a run with no counterplay once you are there.</p></div>
+    <div class="cell"><span class="tag">LATE GAME</span><h4>Numbers stop meaning anything</h4><p>Endless scores turn into e-notation; the scoring animation becomes a wait.</p></div>
+    <div class="cell"><span class="tag">SOLO ONLY</span><h4>No shared moments</h4><p>Seeds get shared by hand. There is no built-in daily run, race or co-op.</p></div>
+    <div class="cell"><span class="tag">FLAT TABLE</span><h4>Space is decoration</h4><p>Joker order is the only spatial rule. A 3D table can make position a mechanic.</p></div>
+    <div class="cell"><span class="tag">ONBOARDING</span><h4>Steep hidden rules</h4><p>Trigger order, retriggers and editions are learned from the wiki rather than the game.</p></div>
+  </div>
+</section>
+
+<!-- ───────── 9 ───────── -->
+<section id="ideas">
+  <div class="col">
+    <span class="eyebrow">Innovations for Neon Joker</span>
+    <h2>Ten changes that keep the hook and fix the gaps</h2>
+    <p>Each proposal names the Balatro rule it replaces, the new mechanic and why it should be more fun. They are sized for our 3D three.js prototype.</p>
+  </div>
+  <div class="props" id="props"></div>
+</section>
+
+<!-- ───────── 10 ───────── -->
+<section id="matrix">
+  <div class="col">
+    <span class="eyebrow">Summary</span>
+    <h2>Keep, change, add</h2>
+  </div>
+  <div class="tablebox">
+    <table class="matrix">
+      <thead><tr><th>System</th><th>Decision</th><th>Neon Joker version</th></tr></thead>
+      <tbody>
+        <tr><td>Chips × Mult scoring</td><td><span class="pill keep">KEEP</span></td><td class="wrap">The core grammar. Add/multiply ordering stays the main skill.</td></tr>
+        <tr><td>Poker hands</td><td><span class="pill keep">KEEP</span></td><td class="wrap">Zero-barrier grammar; secret hands remain deck-building rewards.</td></tr>
+        <tr><td>Interest at $25</td><td><span class="pill keep">KEEP</span></td><td class="wrap">The single best economy tension in the genre.</td></tr>
+        <tr><td>Ante curve</td><td><span class="pill change">CHANGE</span></td><td class="wrap">Shorter ante 1, slightly gentler 4–6 squeeze, overkill converts to Overflow.</td></tr>
+        <tr><td>Boss blinds</td><td><span class="pill change">CHANGE</span></td><td class="wrap">Pick 1 of 2 telegraphed boss rules; every boss has a counterplay.</td></tr>
+        <tr><td>Joker row</td><td><span class="pill change">CHANGE</span></td><td class="wrap">A 3D ring with adjacency and a spotlight seat.</td></tr>
+        <tr><td>Shop randomness</td><td><span class="pill change">CHANGE</span></td><td class="wrap">A pity timer guarantees a ×mult offer by the ante-4 shop.</td></tr>
+        <tr><td>Hand streaks</td><td><span class="pill add">ADD</span></td><td class="wrap">Connect hands within a blind for planning depth.</td></tr>
+        <tr><td>Joker fusion</td><td><span class="pill add">ADD</span></td><td class="wrap">Recipes give mid-run goals and a codex to fill.</td></tr>
+        <tr><td>Daily Table</td><td><span class="pill add">ADD</span></td><td class="wrap">Shared seed, async ghost scores, weekly modifiers.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ───────── 11 ───────── -->
+<section id="tuning">
+  <div class="col">
+    <span class="eyebrow">Tuning targets</span>
+    <h2>What to measure in playtests</h2>
+    <p>Balatro's feel comes from where runs end, not from how many runs are won. These are proposed starting targets for our game. They are design goals to test against, not Balatro data.</p>
+  </div>
+  <div class="tablebox">
+    <table>
+      <thead><tr><th>Metric</th><th class="n">Target</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>First-run loss point</td><td class="n">ante 3–5</td><td class="wrap">Late enough to have built something, early enough to retry quickly.</td></tr>
+        <tr><td>Losses ending at ≥ 70% of target</td><td class="n">≥ 50%</td><td class="wrap">Most losses should be visibly close: the near-miss engine.</td></tr>
+        <tr><td>Base-stake win rate (experienced)</td><td class="n">30–50%</td><td class="wrap">Winnable with skill, never automatic. Raise stakes to tighten.</td></tr>
+        <tr><td>Run length</td><td class="n">25–40 min</td><td class="wrap">Slightly shorter than Balatro; fits a lunch break.</td></tr>
+        <tr><td>Meaningful decisions / minute</td><td class="n">≥ 4</td><td class="wrap">Select, discard, buy, sell, reroll, order, fuse.</td></tr>
+        <tr><td>Biggest hand ÷ blind target</td><td class="n">1.5–3× at ante 8</td><td class="wrap">Winning hands should overshoot enough to feel powerful (feeds Overflow).</td></tr>
+        <tr><td>Time from loss to next first hand</td><td class="n">&lt; 10 s</td><td class="wrap">The cost of "one more run" must be close to zero.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="col" style="display:grid;gap:12px">
+    <h3>Guardrails</h3>
+    <ul class="plain">
+      <li>No real-money randomness: no paid packs, loot boxes or premium rerolls. The pull stays in mastery.</li>
+      <li>Every random reveal ends in a player decision.</li>
+      <li>Meta unlocks add options, not raw power.</li>
+      <li>Natural stopping points (after a cash-out) stay visible, even when the shop is one click away.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="sources">
+  <div class="col" style="display:grid;gap:12px">
+    <span class="eyebrow">Sources</span>
+    <h2>Where the numbers come from</h2>
+    <p style="font-size:16px">Mechanics (hand values, ante targets, stakes, prices, bosses) follow the community-maintained Balatro wiki and guides as of 2025. Prices are typical ranges. The scissors chart and the economy chart are illustrative models, labelled as such.</p>
+    <ul class="plain sources">
+      <li><a href="https://mobilesyrup.com/2025/01/21/balatro-5-million-copies-sold-update/">MobileSyrup: Balatro tops 5 million copies (Jan 2025)</a></li>
+      <li><a href="https://www.pcgamesinsider.biz/news/74922/balatro-has-hit-five-million-sales/">PC Games Insider: five million sales</a></li>
+      <li><a href="https://www.pcgamer.com/i-dont-play-poker-at-all-says-solo-developer-who-made-the-poker-roguelike-i-cant-stop-playing/">PC Gamer: "I don't play poker at all" (LocalThunk interview)</a></li>
+      <li><a href="https://shacknews.com/article/139116/balatro-inspiration-luck-be-a-landlord-reddit-ama?amphtml=1">Shacknews: inspired by Luck Be a Landlord (AMA)</a></li>
+      <li><a href="https://rogueliker.com/balatro-interview/">Rogueliker: Balatro interview</a></li>
+      <li><a href="https://www.nintendolife.com/news/2024/12/balatro-developer-calls-out-pegi-for-its-weirdo-18plus-rating">Nintendo Life: LocalThunk on the PEGI 18 rating</a></li>
+      <li><a href="https://www.gamereactor.eu/balatro-wins-its-pegi-rating-battle-to-have-its-18-rating-reduced-1503623/">Gamereactor: PEGI rating reduced after appeal</a></li>
+      <li><a href="https://primagames.com/gaming/all-poker-hands-and-their-chips-and-mults-in-balatro">Prima Games: poker hand chips and mult</a></li>
+      <li><a href="https://games.gg/balatro/guides/balatro-economy-guide/">games.gg: Balatro economy guide (interest cap)</a></li>
+      <li><a href="https://steamcommunity.com/app/2379780/discussions/0/596263353496658619">Steam discussions: ante scaling by stake</a></li>
+      <li><a href="https://setsideb.com/?p=9384">Set Side B: Balatro University on "naneinf"</a></li>
+    </ul>
+  </div>
+</section>
+
+<footer>Prepared for the Neon Joker prototype (three.js). Balatro is © LocalThunk / Playstack; this is an independent design analysis.</footer>
+</div>
+
+<script>
+(function () {
+  const fmt = (n) => Math.round(n).toLocaleString('en-US');
+  const trim = (v, d) => v.toFixed(d).replace(/\.0$/, '');
+  const short = (n) => n >= 1e6 ? trim(n / 1e6, n >= 1e7 ? 0 : 1) + 'M' : n >= 1e3 ? trim(n / 1e3, n >= 1e4 ? 0 : 1) + 'k' : String(Math.round(n));
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const NS = 'http://www.w3.org/2000/svg';
+  const el = (tag, attrs = {}, parent) => {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) {
+      const v = attrs[k];
+      if ((k === 'fill' || k === 'stroke') && String(v).startsWith('var(')) e.style[k] = v;
+      else e.setAttribute(k, v);
+    }
+    if (parent) parent.appendChild(e);
+    return e;
+  };
+
+  /* ───── data ───── */
+  const HANDS = [
+    ['High Card', 5, 1, 10, 1, ''],
+    ['Pair', 10, 2, 15, 1, ''],
+    ['Two Pair', 20, 2, 20, 1, ''],
+    ['Three of a Kind', 30, 3, 20, 2, ''],
+    ['Straight', 30, 4, 30, 3, ''],
+    ['Flush', 35, 4, 15, 2, ''],
+    ['Full House', 40, 4, 25, 2, ''],
+    ['Four of a Kind', 60, 7, 30, 3, ''],
+    ['Straight Flush', 100, 8, 40, 4, 'Royal Flush is a named variant'],
+    ['Five of a Kind', 120, 12, 35, 3, 'Secret: needs duplicate cards'],
+    ['Flush House', 140, 14, 40, 4, 'Secret'],
+    ['Flush Five', 160, 16, 50, 3, 'Secret'],
+  ];
+  const WHITE = [300, 800, 2000, 5000, 11000, 20000, 35000, 50000];
+  const GREEN = [300, 900, 2600, 8000, 20000, 36000, 60000, 100000];
+  const PURPLE = [300, 1000, 3200, 9000, 25000, 60000, 110000, 200000];
+  const ANTES = [1, 2, 3, 4, 5, 6, 7, 8];
+
+  /* hand table */
+  document.getElementById('handRows').innerHTML = HANDS.map(([n, c, m, lc, lm, note]) =>
+    `<tr><td>${n}</td><td class="n" style="color:var(--chips)">${c}</td><td class="n" style="color:var(--mult)">${m}</td><td class="n">+${lc} / +${lm}</td><td class="n">${fmt(c * m)}</td><td class="muted">${note}</td></tr>`).join('');
+
+  /* curve table */
+  document.getElementById('curveRows').innerHTML = ANTES.map((a, i) =>
+    `<tr><td>${a}</td><td class="n">${fmt(WHITE[i])}</td><td class="n">${i ? (WHITE[i] / WHITE[i - 1]).toFixed(2) + '×' : '–'}</td><td class="n">${fmt(GREEN[i])}</td><td class="n">${fmt(PURPLE[i])}</td><td class="n">${fmt(WHITE[i] * 2)}</td></tr>`).join('');
+
+  /* ───── hero count-up ───── */
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!reduce) {
+    const steps = [[60, 6], [85, 12], [110, 24], [120, 48]];
+    let k = 0;
+    const tick = () => {
+      const [c, m] = steps[k];
+      document.getElementById('eqC').textContent = c;
+      document.getElementById('eqM').textContent = m;
+      document.getElementById('eqT').textContent = fmt(c * m);
+      k++;
+      if (k < steps.length) setTimeout(tick, 420);
+    };
+    document.getElementById('eqC').textContent = '60';
+    document.getElementById('eqM').textContent = '6';
+    document.getElementById('eqT').textContent = '360';
+    setTimeout(tick, 500);
+  }
+
+  /* ───── tooltip helper ───── */
+  function tooltip(container) {
+    const t = document.createElement('div');
+    t.className = 'tip';
+    t.hidden = true;
+    container.appendChild(t);
+    return {
+      show(html, x, y) { t.innerHTML = html; t.style.left = x + 'px'; t.style.top = y + 'px'; t.hidden = false; },
+      hide() { t.hidden = true; },
+    };
+  }
+
+  function legend(id, items, square) {
+    document.getElementById(id).innerHTML = items.map((s) =>
+      `<span><i class="${square ? 'sq' : ''}" style="background:var(${s.color})"></i>${s.name}</span>`).join('');
+  }
+
+  /* ───── log-scale line chart ───── */
+  function lineChart(id, series, opts) {
+    const box = document.getElementById(id);
+    const W = 720, H = 320, L = 56, R = 70, T = 14, B = 34;
+    const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': opts.label });
+    box.appendChild(svg);
+    const n = series[0].values.length;
+    const lo = Math.log10(opts.min), hi = Math.log10(opts.max);
+    const x = (i) => L + (i / (n - 1)) * (W - L - R);
+    const y = (v) => T + (1 - (Math.log10(v) - lo) / (hi - lo)) * (H - T - B);
+    for (const tv of opts.ticks) {
+      el('line', { x1: L, x2: W - R, y1: y(tv), y2: y(tv), stroke: 'var(--line)', 'stroke-width': 1 }, svg);
+      el('text', { x: L - 8, y: y(tv) + 4, 'text-anchor': 'end' }, svg).textContent = short(tv);
+    }
+    for (let i = 0; i < n; i++) {
+      el('text', { x: x(i), y: H - 12, 'text-anchor': 'middle' }, svg).textContent = 'Ante ' + (i + 1);
+    }
+    const cross = el('line', { y1: T, y2: H - B, stroke: 'var(--muted)', 'stroke-width': 1, 'stroke-dasharray': '3 3', visibility: 'hidden' }, svg);
+    const dotsByS = [];
+    series.forEach((s) => {
+      const col = `var(${s.color})`;
+      const d = s.values.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('');
+      el('path', { d, fill: 'none', stroke: col, 'stroke-width': 2.5, 'stroke-linejoin': 'round', 'stroke-dasharray': s.dash || '' }, svg);
+      const dots = s.values.map((v, i) => el('circle', { cx: x(i), cy: y(v), r: 4.5, fill: col, stroke: 'var(--surface)', 'stroke-width': 2 }, svg));
+      dotsByS.push(dots);
+      const last = s.values[n - 1];
+      el('text', { x: x(n - 1) + 10, y: y(last) + 4, class: 'lbl' }, svg).textContent = short(last);
+    });
+    const tip = tooltip(box);
+    const hit = el('rect', { x: L, y: T, width: W - L - R, height: H - T - B, fill: 'transparent' }, svg);
+    const move = (ev) => {
+      const r = svg.getBoundingClientRect();
+      const px = ((ev.clientX - r.left) / r.width) * W;
+      const i = Math.max(0, Math.min(n - 1, Math.round(((px - L) / (W - L - R)) * (n - 1))));
+      cross.setAttribute('x1', x(i)); cross.setAttribute('x2', x(i)); cross.setAttribute('visibility', 'visible');
+      dotsByS.forEach((dots) => dots.forEach((d, j) => d.setAttribute('r', j === i ? 6.5 : 4.5)));
+      const rows = series.map((s) => `<span style="color:var(${s.color})">■</span> ${s.name}: <b>${fmt(s.values[i])}</b>`).join('<br>');
+      const topV = Math.max(...series.map((s) => s.values[i]));
+      tip.show(`Ante ${i + 1}<br>${rows}`, (x(i) / W) * r.width, (y(topV) / H) * r.height);
+    };
+    hit.addEventListener('pointermove', move);
+    hit.addEventListener('pointerleave', () => { tip.hide(); cross.setAttribute('visibility', 'hidden'); dotsByS.forEach((dots) => dots.forEach((d) => d.setAttribute('r', 4.5))); });
+  }
+
+  /* chart 1: difficulty */
+  const curveSeries = [
+    { name: 'White stake', color: '--s1', values: WHITE },
+    { name: 'Green stake', color: '--s2', values: GREEN },
+    { name: 'Purple stake', color: '--s3', values: PURPLE },
+  ];
+  legend('lgCurve', curveSeries);
+  lineChart('chCurve', curveSeries, { min: 100, max: 1e6, ticks: [100, 1000, 10000, 100000, 1000000], label: 'Base score per ante for White, Green and Purple stakes on a log scale' });
+
+  /* chart 2: scissors model */
+  const need = WHITE.map((v) => (v * 2) / 3);
+  const additive = ANTES.map((a) => (40 + 25 * a) * (3 + 5 * a));
+  const engine = ANTES.map((a, i) => additive[i] * (a >= 4 ? Math.pow(1.4, a - 3) : 1));
+  const sc = [
+    { name: 'Needed per hand', color: '--s1', values: need },
+    { name: 'Additive build', color: '--s2', values: additive },
+    { name: 'Engine (×mult) build', color: '--s3', values: engine },
+  ];
+  legend('lgScissors', sc);
+  lineChart('chScissors', sc, { min: 100, max: 100000, ticks: [100, 1000, 10000, 100000], label: 'Per-hand score needed versus additive and multiplicative builds' });
+
+  /* chart 3: economy stacked bars */
+  (function () {
+    const box = document.getElementById('chEcon');
+    const comps = [
+      { name: 'Blind rewards', color: '--s1' },
+      { name: 'Unused hands', color: '--s2' },
+      { name: 'Interest', color: '--s3' },
+    ];
+    legend('lgEcon', comps, true);
+    const rows = [
+      { name: 'Spender', vals: [12, 3, 3] },
+      { name: 'Saver ($25+)', vals: [12, 3, 15] },
+    ];
+    const W = 720, H = 170, L = 120, R = 70, T = 10, B = 30, max = 35;
+    const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Income per ante: spender $18, saver $30' });
+    box.appendChild(svg);
+    const x = (v) => L + (v / max) * (W - L - R);
+    for (let v = 0; v <= max; v += 5) {
+      el('line', { x1: x(v), x2: x(v), y1: T, y2: H - B, stroke: 'var(--line)', 'stroke-width': 1 }, svg);
+      el('text', { x: x(v), y: H - 10, 'text-anchor': 'middle' }, svg).textContent = '$' + v;
+    }
+    const tip = tooltip(box);
+    const bh = 40;
+    rows.forEach((r, ri) => {
+      const yy = T + 18 + ri * 64;
+      el('text', { x: L - 12, y: yy + bh / 2 + 4, 'text-anchor': 'end', class: 'lbl' }, svg).textContent = r.name;
+      let acc = 0;
+      r.vals.forEach((v, ci) => {
+        const x0 = x(acc), w = x(acc + v) - x0 - 2;
+        const isLast = ci === r.vals.length - 1;
+        const rect = el('rect', { x: x0, y: yy, width: Math.max(1, w), height: bh, rx: isLast ? 4 : 0, fill: `var(${comps[ci].color})` }, svg);
+        if (isLast) el('rect', { x: x0, y: yy, width: Math.min(6, w), height: bh, fill: `var(${comps[ci].color})` }, svg);
+        rect.addEventListener('pointermove', (ev) => {
+          const b = svg.getBoundingClientRect();
+          tip.show(`${r.name}<br>${comps[ci].name}: <b>$${v}</b>`, ev.clientX - b.left, ev.clientY - b.top);
+        });
+        rect.addEventListener('pointerleave', () => tip.hide());
+        acc += v;
+      });
+      el('text', { x: x(acc) + 10, y: yy + bh / 2 + 4, class: 'lbl' }, svg).textContent = '$' + acc + ' / ante';
+    });
+  })();
+
+  /* ───── calculator ───── */
+  (function () {
+    const sel = document.getElementById('cHand');
+    sel.innerHTML = HANDS.map((h, i) => `<option value="${i}" ${i === 1 ? 'selected' : ''}>${h[0]}</option>`).join('');
+    const ids = ['cLvl', 'cChips', 'cMult', 'cX'];
+    const outs = { cLvl: 'oLvl', cChips: 'oChips', cMult: 'oMult', cX: 'oX' };
+    const cells = document.getElementById('anteCells');
+    const update = () => {
+      const h = HANDS[+sel.value];
+      const lvl = +document.getElementById('cLvl').value;
+      const chips = h[1] + h[3] * (lvl - 1) + +document.getElementById('cChips').value;
+      const multAdd = h[2] + h[4] * (lvl - 1) + +document.getElementById('cMult').value;
+      const xs = +document.getElementById('cX').value;
+      const mult = multAdd * Math.pow(1.5, xs);
+      const total = chips * mult;
+      ids.forEach((id) => (document.getElementById(outs[id]).textContent = document.getElementById(id).value));
+      document.getElementById('rC').textContent = fmt(chips);
+      document.getElementById('rM').textContent = mult % 1 ? mult.toFixed(1) : fmt(mult);
+      document.getElementById('rT').textContent = fmt(total);
+      cells.innerHTML = WHITE.map((b, i) => {
+        const boss = b * 2;
+        const four = total * 4;
+        const cls = four >= boss ? 'ok' : four >= boss * 0.6 ? 'close' : '';
+        return `<div class="ante ${cls}" title="Boss target ${fmt(boss)}">Ante ${i + 1}<b>${short(boss)}</b>${Math.min(999, Math.round((four / boss) * 100))}%</div>`;
+      }).join('');
+    };
+    [sel, ...ids.map((id) => document.getElementById(id))].forEach((e) => e.addEventListener('input', update));
+    update();
+  })();
+
+  /* ───── proposals ───── */
+  const PROPS = [
+    ['Overflow', 'Economy', 'Overkill score is wasted.',
+      'Score above the target fills an Overflow meter. Each full meter pays a choice: $3, a planet or a reroll token.',
+      'Big hands feel useful at every ante, and trivial early antes become a race to overshoot.',
+      'Can snowball; cap at 2 payouts per blind.'],
+    ['The Ring', 'Space', 'Jokers sit in a flat row; only left-to-right order matters.',
+      'Jokers sit on a rotating 3D ring of 6 seats. Neighbours can buff each other, and one Spotlight seat retriggers its joker. Rotating the ring costs $1.',
+      'Uses our 3D table as a real mechanic and adds a positional puzzle that reads at a glance.',
+      'Too many adjacency rules overload players; start with 10 adjacency jokers.'],
+    ['Streaks', 'Planning', 'Each hand is scored in isolation.',
+      'Playing a different hand type than the previous one adds +1 Streak (×0.25 mult each). Repeating the type resets it. Discards keep the streak.',
+      'Rewards planning across a blind and opens counter-builds that lean on one hand type.',
+      'Must not punish one-hand-type builds too hard; give them their own jokers.'],
+    ['Telegraphed bosses', 'Fairness', 'Some bosses have no counterplay once you arrive.',
+      'At the start of each ante the boss shows 2 candidate rules. You pick one, or pay $5 to reroll both.',
+      'Turns feel-bad losses into a planning decision; the player owns the risk they chose.',
+      'Easier overall; offset with a slightly steeper ante 7–8.'],
+    ['Joker Fusion', 'Discovery', 'There are few mid-run goals beyond "find ×mult".',
+      'Specific pairs of jokers fuse into a unique legendary at the shop (e.g. Fibonacci + Odd Todd = Golden Ratio). A codex records discovered recipes.',
+      'Gives a run a concrete chase with an "almost had it" pull that skill controls; recipes become shared knowledge.',
+      'Needs clear hints so it is not wiki-only; show a silhouette when you hold one half.'],
+    ['Pity timer', 'Variance', 'A run can die because the shop never offered ×mult.',
+      'If no ×mult joker has been offered by the ante-4 shop, one is guaranteed in the next shop.',
+      'Removes the most common unearned loss while keeping shop surprise.',
+      'Keep it invisible; announcing it changes how players shop.'],
+    ['Draft opening', 'Pacing', 'Ante 1 is often a slow warm-up.',
+      'Start each run by drafting 1 of 3 starter jokers and 1 of 2 deck quirks.',
+      'Build identity starts in the first 30 seconds; replay value increases.',
+      'Strong starters reduce variety; rotate the starter pool.'],
+    ['Last Stand', 'Drama', 'A near-miss on the final hand simply ends the run.',
+      'If the final hand reaches ≥ 85% of the target, you may destroy one joker to replay it once.',
+      'Converts the near-miss into a painful, memorable decision instead of a game-over screen.',
+      'Once per run only, or it becomes a safety net.'],
+    ['Readable scale', 'Feedback', 'Late scores turn into e-notation, and the animations drag.',
+      'Above 1M, show score ranks (Bronze to Cosmic) with a log meter; scoring speeds up with size, and the chip tower and heat effects carry the magnitude.',
+      'Keeps the power fantasy legible at any size.',
+      'Ranks must not hide the real number; show both.'],
+    ['Daily Table', 'Social', 'There are no shared runs or races.',
+      'One seed per day with a weekly modifier, plus async ghost scores from friends shown on the score bar.',
+      'Adds a daily ritual and a social near-miss ("Sam beat me by 2,000").',
+      'Needs a backend; start with a local seed and share codes.'],
+  ];
+  document.getElementById('props').innerHTML = PROPS.map(([name, kind, rep, mech, why, risk]) => `
+    <article class="prop">
+      <div class="head"><h3>${name}</h3><span class="kind">${kind}</span></div>
+      <dl>
+        <dt>Replaces</dt><dd>${rep}</dd>
+        <dt>Mechanic</dt><dd>${mech}</dd>
+        <dt>Why fun</dt><dd>${why}</dd>
+        <dt>Risk</dt><dd class="muted">${risk}</dd>
+      </dl>
+    </article>`).join('');
+})();
+</script>
+
+</body>
+</html>
