@@ -1,5 +1,7 @@
 # Neon Joker 🃏
 
+**Play it:** https://abbcnnhktv.github.io/threejs-balatro-game/
+
 A small Balatro-inspired poker roguelike rendered in 3D with [three.js](https://threejs.org).
 
 - Real 3D cards that fan out in your hand, tilt toward your cursor, wobble idly and fly across the table
@@ -16,6 +18,9 @@ npm run dev      # open the printed URL
 
 `npm run build` produces a static site in `dist/` (relative paths, so it works on GitHub Pages or any static host).
 `npm test` runs the game-logic tests.
+
+Every push to `main` builds and deploys the game to GitHub Pages via `.github/workflows/deploy.yml`
+(one-time setup: **Settings → Pages → Source: GitHub Actions**).
 
 ## How it works
 
