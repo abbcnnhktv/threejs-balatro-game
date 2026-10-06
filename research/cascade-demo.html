@@ -1,0 +1,732 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cascade Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: a game table. 3D stage on top with the score HUD; chain builder, hand and rules underneath. Single committed dark look (a card table at night). */
+:root {
+  --bg: #0d1412;
+  --panel: #152019;
+  --panel-2: #1c2a23;
+  --line: #2a3b33;
+  --ink: #eef3ee;
+  --muted: #96a89f;
+  --chips: #3b8bff;
+  --mult: #ff4a3d;
+  --gold: #ffc23a;
+  --ok: #3ddc97;
+  --special: #b98cff;
+  --card: #f6f1e4;
+  --card-ink: #1d2433;
+  --font-display: "Bungee", Impact, "Arial Black", sans-serif;
+  --font-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  padding-inline: 16px;
+  padding-block: 0 48px;
+}
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 18px; }
+button { font-family: var(--font-body); font-size: 15px; font-weight: 700; cursor: pointer; border: 0; border-radius: 10px; color: var(--ink); }
+button:disabled { opacity: 0.4; cursor: default; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 14px; padding-block: 26px 4px; }
+.brand { display: grid; gap: 6px; min-width: 0; }
+.brand h1 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: clamp(40px, 7vw, 68px); line-height: 0.95; letter-spacing: 0.02em; }
+.brand h1 span { color: var(--gold); }
+.brand p { margin: 0; color: var(--muted); max-width: 56ch; font-size: 17px; }
+.modes { display: flex; flex-wrap: wrap; gap: 10px; }
+.btn { padding: 11px 18px; background: var(--panel-2); border: 1px solid var(--line); }
+.btn:hover:not(:disabled) { background: var(--line); }
+.btn.primary { background: var(--gold); color: #1b1404; border-color: var(--gold); }
+.btn.primary:hover:not(:disabled) { filter: brightness(1.08); background: var(--gold); }
+.btn.go { background: var(--ok); color: #05150d; border-color: var(--ok); font-size: 17px; padding: 12px 24px; }
+.btn.go:hover:not(:disabled) { filter: brightness(1.08); background: var(--ok); }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; align-items: start; }
+@media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+
+/* stage */
+.stage { position: relative; border-radius: 16px; overflow: hidden; border: 1px solid var(--line); background: var(--panel); }
+#gl { display: block; width: 100%; height: auto; }
+.hud { position: absolute; left: 12px; right: 12px; top: 10px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; pointer-events: none; }
+.hud .box { background: rgba(10, 16, 14, 0.78); border: 1px solid var(--line); border-radius: 10px; padding: 6px 12px; display: grid; gap: 0; }
+.hud .k { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.hud .v { font-family: var(--font-mono); font-weight: 700; font-size: 20px; font-variant-numeric: tabular-nums; }
+.hud .v.gold { color: var(--gold); }
+.cm { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-weight: 700; font-size: 20px; }
+.tok { min-width: 54px; text-align: center; padding: 3px 10px; border-radius: 8px; color: #fff; font-variant-numeric: tabular-nums; }
+.tok.c { background: var(--chips); }
+.tok.m { background: var(--mult); }
+.caption {
+  position: absolute; left: 12px; right: 12px; bottom: 12px; pointer-events: none;
+  background: rgba(10, 16, 14, 0.86); border: 1px solid var(--line); border-left: 4px solid var(--gold);
+  border-radius: 10px; padding: 10px 14px; font-size: 17px; min-height: 46px;
+}
+.caption b { color: var(--gold); }
+.pop {
+  position: absolute; transform: translate(-50%, -100%); pointer-events: none; white-space: nowrap;
+  font-family: var(--font-mono); font-weight: 700; font-size: 15px; padding: 3px 9px; border-radius: 8px; color: #fff;
+  animation: rise 1.4s ease-out forwards; box-shadow: 0 3px 0 rgba(0,0,0,0.35);
+}
+.pop.c { background: var(--chips); }
+.pop.m { background: var(--mult); }
+.pop.x { background: var(--mult); font-size: 20px; outline: 2px solid #fff; }
+.pop.s { background: var(--special); color: #160a2b; }
+.pop.bad { background: #3a1513; color: #ffb3ad; border: 1px solid var(--mult); }
+@keyframes rise { 0% { opacity: 0; transform: translate(-50%, -60%) scale(0.6); } 15% { opacity: 1; transform: translate(-50%, -110%) scale(1.1); } 30% { transform: translate(-50%, -120%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -190%); } }
+.banner {
+  position: absolute; inset: 0; display: grid; place-items: center; text-align: center; background: rgba(8, 12, 10, 0.72);
+}
+.banner .inner { display: grid; gap: 10px; justify-items: center; padding: 20px; }
+.banner h2 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: clamp(30px, 5vw, 48px); }
+.banner p { margin: 0; color: var(--muted); font-size: 17px; max-width: 46ch; }
+
+/* builder */
+.builder { display: grid; gap: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+.row-h { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
+.row-h h3 { margin: 0; font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.row-h .hint { font-size: 14px; color: var(--muted); }
+.chain { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 64px; padding: 8px; border-radius: 12px; background: var(--bg); border: 1px dashed var(--line); }
+.chain .empty { color: var(--muted); font-size: 15px; padding: 0 6px; }
+.link { font-family: var(--font-mono); font-size: 11px; font-weight: 700; padding: 3px 6px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+.link.ok { color: var(--ok); border: 1px solid var(--ok); }
+.link.wild { color: var(--special); border: 1px solid var(--special); }
+.link.thru { color: var(--muted); border: 1px solid var(--line); }
+.link.stop { color: #fff; background: var(--mult); }
+.mini {
+  display: inline-grid; place-items: center; width: 40px; height: 54px; border-radius: 7px; background: var(--card); color: var(--card-ink);
+  font-family: var(--font-mono); font-weight: 700; font-size: 15px; line-height: 1.05; padding: 0; border: 2px solid transparent;
+}
+.mini.sp { background: var(--panel-2); color: var(--special); border-color: var(--special); font-size: 11px; width: 54px; }
+.mini.broken { border-color: var(--mult); }
+.hand, .specials { display: flex; flex-wrap: wrap; gap: 8px; }
+.pc {
+  width: 58px; height: 80px; border-radius: 9px; background: var(--card); color: var(--card-ink); display: grid; align-content: space-between;
+  padding: 6px 7px; font-family: var(--font-mono); font-weight: 700; font-size: 18px; text-align: left; box-shadow: 0 4px 0 rgba(0,0,0,0.35);
+  transition: transform 0.12s;
+}
+.pc:hover:not(:disabled) { transform: translateY(-4px); }
+.pc .s { font-size: 26px; text-align: right; line-height: 1; }
+.pc.used { opacity: 0.25; transform: none; }
+.spc {
+  display: grid; gap: 2px; text-align: left; padding: 9px 12px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--special); min-width: 0; flex: 1 1 150px;
+}
+.spc b { color: var(--special); font-size: 15px; }
+.spc span { font-size: 13px; color: var(--muted); font-weight: 400; }
+.spc.used { opacity: 0.3; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.actions .note { font-size: 14px; color: var(--muted); }
+
+/* rules */
+aside.rules { display: grid; gap: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+aside h3 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 20px; color: var(--gold); }
+aside h4 { margin: 0; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+aside ol, aside ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 15px; }
+.rule { display: grid; grid-template-columns: 64px 1fr; gap: 8px; align-items: baseline; font-size: 15px; }
+.rule .link { justify-self: start; }
+.c-t { color: var(--chips); font-weight: 700; }
+.m-t { color: var(--mult); font-weight: 700; }
+.g-t { color: var(--gold); font-weight: 700; }
+.why { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; display: grid; gap: 6px; }
+@media (max-width: 600px) {
+  .hud { position: static; padding: 10px 10px 0; }
+  .hud .box { padding: 4px 8px; }
+  .hud .v, .cm { font-size: 16px; }
+  .tok { min-width: 40px; }
+  .caption { position: static; margin: 0 10px 10px; font-size: 15px; }
+  .stage { display: grid; }
+  #gl { order: 1; }
+  .hud { order: 0; }
+  .caption { order: 2; }
+}
+@media (prefers-reduced-motion: reduce) { .pop { animation-duration: 0.01s; } .pc { transition: none; } }
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <h1>CAS<span>CADE</span></h1>
+      <p>Stand your cards in a line like dominoes and tip the first one. Each card knocks over the next only if they share something. Every card that falls scores <span class="c-t">chips</span> × <span class="m-t">mult</span>.</p>
+    </div>
+    <div class="modes">
+      <button class="btn primary" id="btnWatch">▶ Watch an example</button>
+      <button class="btn" id="btnPlay">Deal a new game</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <div style="display:grid;gap:14px;min-width:0">
+      <div class="stage" id="stage">
+        <canvas id="gl" aria-label="3D table showing the domino chain of cards"></canvas>
+        <div class="hud">
+          <div class="box"><span class="k">Target</span><span class="v" id="hTarget">4,000</span></div>
+          <div class="box"><span class="k">Score</span><span class="v gold" id="hScore">0</span></div>
+          <div class="box"><span class="k">This tip</span><div class="cm"><span class="tok c" id="hChips">0</span>×<span class="tok m" id="hMult">1</span></div></div>
+          <div class="box"><span class="k">Tips left</span><span class="v" id="hTips">3</span></div>
+        </div>
+        <div class="caption" id="caption" aria-live="polite">Press <b>Watch an example</b> to see one tip explained, or build your own chain below.</div>
+        <div id="pops"></div>
+        <div class="banner" id="banner" hidden><div class="inner"><h2 id="bTitle"></h2><p id="bText"></p><button class="btn primary" id="bBtn">Deal a new game</button></div></div>
+      </div>
+
+      <div class="builder">
+        <div class="row-h"><h3>Your chain</h3><span class="hint">Click a piece in the chain to take it out</span></div>
+        <div class="chain" id="chain"></div>
+        <div class="row-h"><h3>Your hand</h3><span class="hint">Click a card to stand it at the end of the chain</span></div>
+        <div class="hand" id="hand"></div>
+        <div class="row-h"><h3>Special pieces</h3><span class="hint">Each can be used once per tip</span></div>
+        <div class="specials" id="specials"></div>
+        <div class="actions">
+          <button class="btn go" id="btnTip">Tip it!</button>
+          <button class="btn" id="btnClear">Clear chain</button>
+          <span class="note" id="note"></span>
+        </div>
+      </div>
+    </div>
+
+    <aside class="rules" aria-label="Rules">
+      <h3>The rules on one card</h3>
+      <div style="display:grid;gap:8px">
+        <h4>A card knocks the next one over if they share:</h4>
+        <div class="rule"><span class="link ok">pair</span><span>the same rank: <span class="m-t">+4 mult</span></span></div>
+        <div class="rule"><span class="link ok">step</span><span>ranks one apart (6→7): <span class="m-t">+2 mult</span>. Three steps in a row add <span class="m-t">+3</span> more each.</span></div>
+        <div class="rule"><span class="link ok">suit</span><span>the same suit: <span class="c-t">+10 chips</span></span></div>
+        <div class="rule"><span class="link stop">✕ stop</span><span>nothing shared: the chain stops there, and everything after it scores nothing.</span></div>
+      </div>
+      <div style="display:grid;gap:8px">
+        <h4>Every card that falls also adds</h4>
+        <p style="margin:0;font-size:15px">its value in <span class="c-t">chips</span>: 2–10 at face value, J/Q/K 10, A 11.</p>
+      </div>
+      <div style="display:grid;gap:8px">
+        <h4>Special pieces</h4>
+        <div class="rule"><span class="link wild">bridge</span><span>Wild: the next card always links.</span></div>
+        <div class="rule"><span class="link wild">loop</span><span>Replays the last two cards' scores.</span></div>
+        <div class="rule"><span class="link wild">ramp</span><span><span class="m-t">×2 mult</span> at the moment it falls. Put it late.</span></div>
+      </div>
+      <div class="why">
+        <span><b class="g-t">Goal:</b> reach the target in 3 tips. After each tip you draw back up to 8 cards.</span>
+        <span><b class="g-t">Why it's Balatro:</b> same chips × mult, same "add first, multiply last" skill. You see every link before you tip, so a broken chain is always your call.</span>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const fmt = (n) => Math.round(n).toLocaleString('en-US');
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const SPEED = REDUCE ? 0.35 : 1;
+
+  /* ───────── rules (pure) ───────── */
+  const SUITS = { s: '♠', h: '♥', c: '♣', d: '♦' };
+  const SUIT_COLOR = { s: '#24305e', h: '#d7263d', c: '#14806f', d: '#e8781e' };
+  const RL = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
+  const rl = (r) => RL[r] || String(r);
+  const val = (r) => (r === 14 ? 11 : r >= 10 ? 10 : r);
+  const label = (p) => (p.sp ? SPECIALS[p.sp].name : rl(p.r) + SUITS[p.s]);
+  const SPECIALS = {
+    bridge: { name: 'BRIDGE', icon: '⇄', text: 'Next card always links' },
+    loop: { name: 'LOOP', icon: '↺', text: 'Replay last two cards' },
+    ramp: { name: 'RAMP', icon: '×2', text: '×2 mult when it falls' },
+  };
+  function linksOf(a, b) {
+    const l = [];
+    if (a.r === b.r) l.push('pair');
+    if (Math.abs(a.r - b.r) === 1 || (a.r === 14 && b.r === 2) || (a.r === 2 && b.r === 14)) l.push('step');
+    if (a.s === b.s) l.push('suit');
+    return l;
+  }
+  // For the chain preview: what links each piece to the one before it?
+  function previewLinks(chain) {
+    let prev = null, wild = false;
+    return chain.map((p, i) => {
+      if (i === 0) { if (p.sp === 'bridge') wild = true; if (!p.sp) prev = p; return { kind: 'first' }; }
+      if (p.sp) { if (p.sp === 'bridge') { wild = true; } return { kind: 'thru' }; }
+      let res;
+      if (wild || !prev) res = { kind: 'wild' };
+      else { const l = linksOf(prev, p); res = l.length ? { kind: 'ok', l } : { kind: 'stop' }; }
+      wild = false; prev = p;
+      return res;
+    });
+  }
+  function simulate(chain) {
+    let chips = 0, mult = 1, run = 1, prev = null, wild = false;
+    const hist = [], ev = [];
+    for (let i = 0; i < chain.length; i++) {
+      const p = chain[i];
+      if (p.sp === 'ramp') { mult *= 2; ev.push({ i, kind: 'ramp', chips, mult }); continue; }
+      if (p.sp === 'loop') {
+        const last = hist.slice(-2);
+        let dc = 0, dm = 0;
+        for (const h of last) { dc += h.c; dm += h.m; }
+        chips += dc; mult += dm;
+        ev.push({ i, kind: 'loop', dc, dm, chips, mult, n: last.length });
+        continue;
+      }
+      if (p.sp === 'bridge') { wild = true; ev.push({ i, kind: 'bridge', chips, mult }); continue; }
+      let c = val(p.r), m = 0;
+      const tags = [];
+      if (prev && !wild) {
+        const L = linksOf(prev, p);
+        if (!L.length) { ev.push({ i, kind: 'break', chips, mult, prev }); return { ev, chips, mult, score: Math.round(chips * mult), broke: i }; }
+        if (L.includes('pair')) { m += 4; tags.push('pair +4'); }
+        if (L.includes('step')) { run++; m += 2; tags.push('step +2'); if (run >= 3) { m += 3; tags.push('run +3'); } } else run = 1;
+        if (L.includes('suit')) { c += 10; tags.push('suit +10'); }
+      } else run = 1;
+      wild = false;
+      chips += c; mult += m;
+      hist.push({ c, m });
+      ev.push({ i, kind: 'card', c, m, base: val(p.r), tags, chips, mult });
+      prev = p;
+    }
+    return { ev, chips, mult, score: Math.round(chips * mult), broke: -1 };
+  }
+
+  /* ───────── audio (starts after first click) ───────── */
+  let ac = null;
+  function blip(freq, dur = 0.09, type = 'triangle', vol = 0.18) {
+    try {
+      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = type; o.frequency.value = freq;
+      g.gain.setValueAtTime(vol, ac.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + dur);
+      o.connect(g).connect(ac.destination); o.start(); o.stop(ac.currentTime + dur + 0.02);
+    } catch (e) { /* audio is optional */ }
+  }
+
+  /* ───────── 3D stage ───────── */
+  const canvas = $('gl');
+  const stage = $('stage');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color('#0f1915');
+  const camera = new THREE.PerspectiveCamera(34, 2, 0.1, 100);
+  const LOOK = new THREE.Vector3(0, 0.42, 0);
+
+  scene.add(new THREE.HemisphereLight(0xdfffee, 0x0b1210, 0.75));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.95);
+  sun.position.set(-3, 6, 5);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024);
+  Object.assign(sun.shadow.camera, { left: -6, right: 6, top: 4, bottom: -4, near: 1, far: 20 });
+  scene.add(sun);
+
+  // felt table
+  function feltTexture() {
+    const c = document.createElement('canvas');
+    c.width = c.height = 512;
+    const g = c.getContext('2d');
+    const grad = g.createRadialGradient(256, 256, 40, 256, 256, 360);
+    grad.addColorStop(0, '#22543f');
+    grad.addColorStop(1, '#0f2a20');
+    g.fillStyle = grad; g.fillRect(0, 0, 512, 512);
+    for (let i = 0; i < 9000; i++) { g.fillStyle = `rgba(255,255,255,${Math.random() * 0.025})`; g.fillRect(Math.random() * 512, Math.random() * 512, 1, 1); }
+    const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t;
+  }
+  const table = new THREE.Mesh(new THREE.PlaneGeometry(16, 8), new THREE.MeshStandardMaterial({ map: feltTexture(), roughness: 0.95 }));
+  table.rotation.x = -Math.PI / 2;
+  table.receiveShadow = true;
+  scene.add(table);
+
+  // slot markers (where pieces will stand)
+  const SLOTS = 8, GAP = 0.86, CW = 0.72, CH = 1.0, CD = 0.035;
+  const slotX = (i, n) => (i - (n - 1) / 2) * GAP;
+  const slotMarks = [];
+  for (let i = 0; i < SLOTS; i++) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(CW + 0.06, 0.06), new THREE.MeshBasicMaterial({ color: 0x3a6b55, transparent: true, opacity: 0.6 }));
+    m.rotation.x = -Math.PI / 2; m.position.set(slotX(i, SLOTS), 0.002, 0.04);
+    scene.add(m); slotMarks.push(m);
+  }
+
+  const texCache = new Map();
+  function faceTexture(p) {
+    const key = p.sp || p.r + p.s;
+    if (texCache.has(key)) return texCache.get(key);
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 356;
+    const g = c.getContext('2d');
+    const rr = (x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    if (p.sp) {
+      const s = SPECIALS[p.sp];
+      g.fillStyle = '#1b1430'; rr(0, 0, 256, 356, 22); g.fill();
+      g.strokeStyle = '#b98cff'; g.lineWidth = 8; rr(10, 10, 236, 336, 16); g.stroke();
+      g.fillStyle = '#b98cff'; g.font = '700 118px "JetBrains Mono", monospace'; g.fillText(s.icon, 128, 140);
+      g.fillStyle = '#ffffff'; g.font = '40px Bungee, Impact, sans-serif'; g.fillText(s.name, 128, 250);
+      g.fillStyle = '#cdbbff'; g.font = '700 22px "Atkinson Hyperlegible", sans-serif'; g.fillText(s.text, 128, 300);
+    } else {
+      const col = SUIT_COLOR[p.s];
+      g.fillStyle = '#f6f1e4'; rr(0, 0, 256, 356, 22); g.fill();
+      g.strokeStyle = 'rgba(0,0,0,0.15)'; g.lineWidth = 5; rr(6, 6, 244, 344, 18); g.stroke();
+      g.fillStyle = col;
+      g.font = '700 62px "JetBrains Mono", monospace'; g.fillText(rl(p.r), 46, 50);
+      g.font = '46px sans-serif'; g.fillText(SUITS[p.s] + '︎', 46, 102);
+      g.font = '150px sans-serif'; g.fillText(SUITS[p.s] + '︎', 128, 205);
+      g.save(); g.translate(256, 356); g.rotate(Math.PI);
+      g.font = '700 62px "JetBrains Mono", monospace'; g.fillText(rl(p.r), 46, 50);
+      g.restore();
+    }
+    const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; t.anisotropy = 4;
+    texCache.set(key, t);
+    return t;
+  }
+  const backTex = (() => {
+    const c = document.createElement('canvas'); c.width = 128; c.height = 178;
+    const g = c.getContext('2d'); g.fillStyle = '#9e1f2a'; g.fillRect(0, 0, 128, 178);
+    g.strokeStyle = 'rgba(255,210,150,0.35)'; g.lineWidth = 3;
+    for (let i = -178; i < 300; i += 16) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i + 178, 178); g.stroke(); }
+    const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t;
+  })();
+  const edgeMat = new THREE.MeshStandardMaterial({ color: 0xe8e2d2, roughness: 0.6 });
+  const cardGeo = new THREE.BoxGeometry(CW, CH, CD);
+
+  // A standing piece: pivot sits at the bottom-right edge so the card tips to the right.
+  let pieces = [];
+  function makePiece(p, i, n) {
+    const pivot = new THREE.Group();
+    const front = new THREE.MeshStandardMaterial({ map: faceTexture(p), roughness: 0.5, emissive: 0x000000 });
+    const back = new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.6 });
+    const mesh = new THREE.Mesh(cardGeo, [edgeMat, edgeMat, edgeMat, edgeMat, front, back]);
+    mesh.castShadow = true;
+    mesh.position.set(-CW / 2, CH / 2, 0);
+    pivot.add(mesh);
+    pivot.position.set(slotX(i, n) + CW / 2, 0, 0);
+    pivot.userData = { rot: 0, target: 0, y: 2.2, ty: 0, shake: 0, front };
+    pivot.position.y = 2.2;
+    scene.add(pivot);
+    return pivot;
+  }
+  function syncPieces(chain) {
+    pieces.forEach((pv) => scene.remove(pv));
+    pieces = chain.map((p, i) => makePiece(p, i, SLOTS));
+    pieces.forEach((pv) => { pv.position.y = 0; pv.userData.y = 0; });
+  }
+  function addPiece(p, idx) {
+    const pv = makePiece(p, idx, SLOTS);
+    pieces.push(pv);
+    blip(520 + idx * 40, 0.06, 'square', 0.06);
+  }
+
+  function resize() {
+    const w = stage.clientWidth;
+    const aspect = w < 600 ? 1.25 : 2.4;
+    const h = Math.round(w / aspect);
+    renderer.setSize(w, h, false);
+    canvas.style.height = h + 'px';
+    camera.aspect = aspect;
+    const half = THREE.MathUtils.degToRad(camera.fov / 2);
+    const needW = SLOTS * GAP + 0.35;
+    const d = Math.max(3.6, needW / (2 * Math.tan(half) * aspect));
+    camera.position.set(0, 0.5 + d * 0.3, d);
+    camera.lookAt(LOOK);
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', resize);
+
+  function toScreen(v) {
+    const p = v.clone().project(camera);
+    return { x: (p.x * 0.5 + 0.5) * canvas.clientWidth, y: (-p.y * 0.5 + 0.5) * canvas.clientHeight };
+  }
+  function pop(i, text, cls, yOff = 0) {
+    const pv = pieces[i];
+    if (!pv) return;
+    const at = toScreen(new THREE.Vector3(pv.position.x - CW / 2, 0.75 + yOff, 0));
+    const el = document.createElement('div');
+    el.className = 'pop ' + cls; el.textContent = text;
+    el.style.left = at.x + 'px'; el.style.top = at.y + 'px';
+    $('pops').appendChild(el);
+    setTimeout(() => el.remove(), 1500);
+  }
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    for (const pv of pieces) {
+      const u = pv.userData;
+      const k = 1 - Math.exp(-(u.fast ? 16 : 10) * dt);
+      u.rot += (u.target - u.rot) * k;
+      u.y += (u.ty - u.y) * (1 - Math.exp(-12 * dt));
+      u.shake = Math.max(0, u.shake - dt * 1.5);
+      pv.rotation.z = u.rot + Math.sin(now / 35) * 0.06 * u.shake;
+      pv.position.y = u.y;
+    }
+    renderer.render(scene, camera);
+    requestAnimationFrame(frame);
+  }
+
+  /* ───────── game state ───────── */
+  const TARGET = 4000, TIPS = 3;
+  const S = { deck: [], hand: [], chain: [], used: {}, score: 0, tips: TIPS, busy: false, demo: false };
+  function newDeck() {
+    const d = [];
+    for (const s of 'shcd') for (let r = 2; r <= 14; r++) d.push({ r, s, id: r + s });
+    for (let i = d.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [d[i], d[j]] = [d[j], d[i]]; }
+    return d;
+  }
+  function sortHand() { S.hand.sort((a, b) => a.r - b.r || a.s.localeCompare(b.s)); }
+  function draw() { while (S.hand.length < 8 && S.deck.length) S.hand.push(S.deck.pop()); sortHand(); }
+  function setHud(chips, mult) {
+    $('hTarget').textContent = fmt(TARGET);
+    $('hScore').textContent = fmt(S.score);
+    $('hTips').textContent = S.tips;
+    $('hChips').textContent = fmt(chips ?? 0);
+    $('hMult').textContent = mult == null ? '1' : (mult % 1 ? mult.toFixed(1) : fmt(mult));
+  }
+  function caption(html) { $('caption').innerHTML = html; }
+
+  function render() {
+    const inChain = new Set(S.chain.filter((p) => !p.sp).map((p) => p.id));
+    // hand
+    $('hand').innerHTML = '';
+    S.hand.forEach((c) => {
+      const b = document.createElement('button');
+      b.className = 'pc' + (inChain.has(c.id) ? ' used' : '');
+      b.disabled = S.busy || S.demo || inChain.has(c.id) || S.chain.length >= SLOTS;
+      b.style.color = SUIT_COLOR[c.s];
+      b.innerHTML = `<span>${rl(c.r)}</span><span class="s">${SUITS[c.s]}︎</span>`;
+      b.setAttribute('aria-label', 'Stand ' + rl(c.r) + ' of ' + { s: 'spades', h: 'hearts', c: 'clubs', d: 'diamonds' }[c.s]);
+      b.onclick = () => place(c);
+      $('hand').appendChild(b);
+    });
+    // specials
+    $('specials').innerHTML = '';
+    Object.keys(SPECIALS).forEach((k) => {
+      const s = SPECIALS[k];
+      const used = S.chain.some((p) => p.sp === k);
+      const b = document.createElement('button');
+      b.className = 'spc' + (used ? ' used' : '');
+      b.disabled = S.busy || S.demo || used || S.chain.length >= SLOTS;
+      b.innerHTML = `<b>${s.icon} ${s.name}</b><span>${s.text}</span>`;
+      b.onclick = () => place({ sp: k, id: k });
+      $('specials').appendChild(b);
+    });
+    // chain preview
+    const box = $('chain');
+    box.innerHTML = '';
+    if (!S.chain.length) box.innerHTML = '<span class="empty">Empty. Pick cards from your hand to stand them here, left to right.</span>';
+    const pl = previewLinks(S.chain);
+    let stopped = false;
+    S.chain.forEach((p, i) => {
+      const L = pl[i];
+      if (i > 0) {
+        const t = document.createElement('span');
+        if (L.kind === 'ok') { t.className = 'link ok'; t.textContent = L.l.join(' + '); }
+        else if (L.kind === 'wild') { t.className = 'link wild'; t.textContent = 'wild'; }
+        else if (L.kind === 'stop') { t.className = 'link stop'; t.textContent = '✕ stops'; }
+        else { t.className = 'link thru'; t.textContent = '→'; }
+        box.appendChild(t);
+      }
+      if (L.kind === 'stop') stopped = true;
+      const b = document.createElement('button');
+      b.className = 'mini' + (p.sp ? ' sp' : '') + (L.kind === 'stop' ? ' broken' : '');
+      if (!p.sp) b.style.color = SUIT_COLOR[p.s];
+      b.textContent = p.sp ? SPECIALS[p.sp].name : label(p);
+      b.title = 'Take it out';
+      b.disabled = S.busy || S.demo;
+      b.onclick = () => removeAt(i);
+      box.appendChild(b);
+    });
+    const real = S.chain.filter((p) => !p.sp).length;
+    $('btnTip').disabled = S.busy || S.demo || real === 0 || S.tips <= 0;
+    $('btnClear').disabled = S.busy || S.demo || !S.chain.length;
+    $('note').textContent = stopped ? 'Heads up: the chain stops at the red ✕. Cards after it will not score.' : real ? `${S.chain.length}/${SLOTS} pieces standing.` : '';
+    setHud();
+  }
+
+  function place(p) {
+    if (S.chain.length >= SLOTS) return;
+    S.chain.push(p);
+    addPiece(p, S.chain.length - 1);
+    pieces[pieces.length - 1].userData.ty = 0;
+    render();
+  }
+  function removeAt(i) {
+    S.chain.splice(i, 1);
+    syncPieces(S.chain);
+    blip(300, 0.06, 'square', 0.05);
+    render();
+  }
+  function clearChain() { S.chain = []; syncPieces(S.chain); render(); }
+
+  async function tip(captions) {
+    if (S.busy) return;
+    S.busy = true; render();
+    const res = simulate(S.chain);
+    setHud(0, 1);
+    caption('<b>Tipping…</b> watch each card knock over the next.');
+    let n = 0;
+    for (const e of res.ev) {
+      const pv = pieces[e.i];
+      if (e.kind === 'break') {
+        // previous piece leans on this one; this one wobbles and stays up
+        const prevIdx = e.i - 1;
+        if (pieces[prevIdx]) pieces[prevIdx].userData.target = -0.22;
+        pv.userData.shake = 1.2;
+        pv.userData.front.emissive.setHex(0x551010);
+        pop(e.i, '✕ no link', 'bad');
+        blip(140, 0.3, 'sawtooth', 0.12);
+        caption(captions?.break || `<b>Chain stopped.</b> ${label(e.prev)} and ${label(S.chain[e.i])} share nothing, so the rest of the line never falls.`);
+        await wait(1200 * SPEED);
+        break;
+      }
+      pv.userData.target = -1.42;
+      n++;
+      if (e.kind === 'card') {
+        blip(330 * Math.pow(1.06, n), 0.1);
+        pop(e.i, '+' + e.c, 'c');
+        if (e.m) setTimeout(() => pop(e.i, '+' + e.m + ' mult', 'm', 0.32), 160 * SPEED);
+        if (captions?.card) caption(captions.card(e, S.chain[e.i]));
+      } else if (e.kind === 'ramp') {
+        blip(180, 0.35, 'sawtooth', 0.15);
+        pop(e.i, '×2 MULT', 'x');
+        if (captions?.ramp) caption(captions.ramp(e));
+      } else if (e.kind === 'loop') {
+        blip(660, 0.15, 'triangle', 0.15);
+        pop(e.i, `↺ +${e.dc} chips +${e.dm} mult`, 's');
+        if (captions?.loop) caption(captions.loop(e));
+      } else {
+        blip(800, 0.1, 'triangle', 0.12);
+        pop(e.i, '⇄ wild', 's');
+        if (captions?.bridge) caption(captions.bridge(e));
+      }
+      setHud(e.chips, e.mult);
+      await wait((captions ? 1300 : 520) * SPEED);
+    }
+    // the last standing piece of a complete chain falls flat
+    await wait(350 * SPEED);
+    const total = res.score;
+    S.score += total;
+    S.tips -= 1;
+    blip(392, 0.25); blip(523, 0.25); blip(659, 0.3);
+    caption(`<b>${fmt(res.chips)} chips × ${res.mult % 1 ? res.mult.toFixed(1) : fmt(res.mult)} mult = ${fmt(total)}</b>${res.broke >= 0 ? `. The chain broke after ${res.broke} piece${res.broke === 1 ? '' : 's'}.` : '. Full chain!'}`);
+    setHud(res.chips, res.mult);
+    await wait(1600 * SPEED);
+    return res;
+  }
+
+  function afterTip() {
+    const usedIds = new Set(S.chain.filter((p) => !p.sp).map((p) => p.id));
+    S.hand = S.hand.filter((c) => !usedIds.has(c.id));
+    S.chain = [];
+    syncPieces(S.chain);
+    draw();
+    S.busy = false;
+    if (S.score >= TARGET) return endGame(true);
+    if (S.tips <= 0) return endGame(false);
+    caption(`Score <b>${fmt(S.score)}</b> of ${fmt(TARGET)}. ${S.tips} tip${S.tips === 1 ? '' : 's'} left. New cards drawn: build the next chain.`);
+    render();
+  }
+
+  function endGame(win) {
+    S.busy = true; render();
+    $('bTitle').textContent = win ? 'Blind cleared!' : `Short by ${fmt(TARGET - S.score)}`;
+    $('bTitle').style.color = win ? 'var(--gold)' : 'var(--mult)';
+    $('bText').textContent = win
+      ? `You scored ${fmt(S.score)} against a target of ${fmt(TARGET)}. In the full game, the shop would open now.`
+      : `You scored ${fmt(S.score)} of ${fmt(TARGET)}. One more link would have done it. That gap is the near-miss that makes you deal again.`;
+    $('banner').hidden = false;
+  }
+
+  function newGame() {
+    $('banner').hidden = true;
+    S.deck = newDeck(); S.hand = []; S.chain = []; S.score = 0; S.tips = TIPS; S.busy = false; S.demo = false;
+    syncPieces([]);
+    draw();
+    caption('Click cards in your hand to stand them in a line. Check the links between them, then press <b>Tip it!</b>');
+    render();
+  }
+
+  /* ───────── guided example ───────── */
+  const C = (r, s) => ({ r, s, id: r + s });
+  async function watchExample() {
+    if (S.busy && !S.demo) return;
+    $('banner').hidden = true;
+    S.demo = true; S.busy = false;
+    S.deck = newDeck();
+    S.hand = [C(2, 'd'), C(5, 'h'), C(6, 'h'), C(6, 'c'), C(7, 'c'), C(8, 'c'), C(9, 'd'), C(13, 's')];
+    S.deck = S.deck.filter((c) => !S.hand.some((h) => h.id === c.id));
+    S.chain = []; S.score = 0; S.tips = TIPS;
+    syncPieces([]);
+    render();
+    const step = async (html, fn, ms = 2600) => { caption(html); if (fn) fn(); render(); await wait(ms * (REDUCE ? 0.6 : 1)); };
+    await step('You draw <b>8 cards</b>. This tip, you will stand some of them in a line on the table.', null, 2600);
+    await step('<b>5♥</b> goes first. It starts the chain.', () => place(C(5, 'h')));
+    await step('<b>6♥</b> links to 5♥ two ways: one rank apart (<b>step</b>) and the same suit (<b>suit</b>). Look at the green badge.', () => place(C(6, 'h')), 3200);
+    await step('<b>6♣</b> links to 6♥ by rank: a <b>pair</b>.', () => place(C(6, 'c')));
+    await step('Now <b>K♠</b>. It shares nothing with 6♣. The red <b>✕ stops</b> badge warns you the chain would stop here.', () => place(C(13, 's')), 3600);
+    await step('So take it back out. Choosing the order is the whole puzzle.', () => removeAt(3), 2400);
+    await step('<b>7♣</b> follows 6♣: a step and the same suit. Three steps in a row also earn a <b>run</b> bonus.', () => place(C(7, 'c')), 3200);
+    await step('A <b>Loop</b> piece replays the last two cards\' scores when it falls.', () => place({ sp: 'loop', id: 'loop' }), 3000);
+    await step('<b>8♣</b> still has to link to 7♣ across the Loop: step, suit and run.', () => place(C(8, 'c')), 3000);
+    await step('<b>Ramp</b> doubles the mult at the moment it falls, so put it last: add first, multiply last. Same skill as Balatro.', () => place({ sp: 'ramp', id: 'ramp' }), 3600);
+    await step('Ready. <b>Tip it!</b>', null, 1400);
+    S.demo = false;
+    const res = await tip({
+      card: (e, p) => `<b>${label(p)}</b> falls: <span class="c-t">+${e.base} chips</span> for its value${e.tags.length ? ', links: <b>' + e.tags.join(', ') + '</b>' : ' (first card, nothing to link to)'}.`,
+      loop: (e) => `<b>Loop</b> replays the last two cards: <span class="c-t">+${e.dc} chips</span>, <span class="m-t">+${e.dm} mult</span>.`,
+      ramp: (e) => `<b>Ramp</b>: mult doubles to <span class="m-t">${fmt(e.mult)}</span>. Because it fell last, it doubled everything before it.`,
+    });
+    S.demo = true;
+    await wait(800);
+    caption(`One tip scored <b>${fmt(res.score)}</b>. A real game gives you <b>3 tips</b> to reach the target, with random cards. Press <b>Deal a new game</b> to try.`);
+    S.score = 0; S.tips = TIPS; S.chain = []; syncPieces([]);
+    S.demo = false; S.busy = false;
+    S.deck = newDeck(); S.hand = []; draw();
+    render();
+  }
+
+  $('btnTip').onclick = async () => { await tip(); afterTip(); };
+  $('btnClear').onclick = clearChain;
+  $('btnPlay').onclick = newGame;
+  $('bBtn').onclick = newGame;
+  $('btnWatch').onclick = watchExample;
+
+  function start() {
+    resize();
+    requestAnimationFrame(frame);
+    newGame();
+    // show an example chain at rest so the first frame explains itself
+    const starters = [C(4, 'd'), C(5, 'd'), C(5, 's')];
+    const ids = new Set(starters.map((c) => c.id));
+    S.deck = newDeck().filter((c) => !ids.has(c.id));
+    S.hand = [];
+    while (S.hand.length < 5) S.hand.push(S.deck.pop());
+    S.hand.push(...starters);
+    sortHand();
+    starters.forEach((c) => place(S.hand.find((h) => h.id === c.id)));
+    caption('Three cards are already standing: <b>4♦ → 5♦</b> (step + suit) <b>→ 5♠</b> (pair). Add more, or press <b>Tip it!</b> Want it explained? Press <b>Watch an example</b>.');
+  }
+  const fontsReady = document.fonts && document.fonts.ready ? Promise.race([document.fonts.ready, wait(1500)]) : Promise.resolve();
+  fontsReady.then(start);
+})();
+</script>
+
+</body>
+</html>
