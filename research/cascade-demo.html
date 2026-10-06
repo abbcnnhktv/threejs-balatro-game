@@ -2,231 +2,207 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Cascade Prototype</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+SC:wght@500;700;900&family=JetBrains+Mono:wght@700&display=swap">
 <style>
-/* Layout: a game table. 3D stage on top with the score HUD; chain builder, hand and rules underneath. Single committed dark look (a card table at night). */
+/* Layout: full-screen game. The 3D table fills the window; a Balatro-style score column sits on the left, actions bottom-right, captions top-center. Single committed dark look (a card table under a lamp). */
 :root {
-  --bg: #0d1412;
-  --panel: #152019;
-  --panel-2: #1c2a23;
-  --line: #2a3b33;
-  --ink: #eef3ee;
-  --muted: #96a89f;
+  --bg: #0b1210;
+  --panel: rgba(14, 22, 19, 0.9);
+  --panel-solid: #121c18;
+  --line: #2b3c34;
+  --ink: #f1f5f1;
+  --muted: #9aaca3;
   --chips: #3b8bff;
   --mult: #ff4a3d;
   --gold: #ffc23a;
   --ok: #3ddc97;
   --special: #b98cff;
-  --card: #f6f1e4;
-  --card-ink: #1d2433;
-  --font-display: "Bungee", Impact, "Arial Black", sans-serif;
-  --font-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --font-display: "Bungee", "Noto Sans SC", Impact, sans-serif;
+  --font-body: "Noto Sans SC", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Noto Sans SC", ui-monospace, monospace;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-body {
-  background: var(--bg);
-  color: var(--ink);
-  font-family: var(--font-body);
-  font-size: 16px;
-  line-height: 1.5;
-  padding-inline: 16px;
-  padding-block: 0 48px;
-}
-.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 18px; }
-button { font-family: var(--font-body); font-size: 15px; font-weight: 700; cursor: pointer; border: 0; border-radius: 10px; color: var(--ink); }
-button:disabled { opacity: 0.4; cursor: default; }
+html, body { height: 100%; }
+body { margin: 0; overflow: hidden; background: var(--bg); color: var(--ink); font-family: var(--font-body); user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+button { font-family: var(--font-body); font-weight: 900; cursor: pointer; border: 0; color: var(--ink); }
+button:disabled { cursor: default; filter: grayscale(0.8) brightness(0.55); }
 :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
-header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 14px; padding-block: 26px 4px; }
-.brand { display: grid; gap: 6px; min-width: 0; }
-.brand h1 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: clamp(40px, 7vw, 68px); line-height: 0.95; letter-spacing: 0.02em; }
-.brand h1 span { color: var(--gold); }
-.brand p { margin: 0; color: var(--muted); max-width: 56ch; font-size: 17px; }
-.modes { display: flex; flex-wrap: wrap; gap: 10px; }
-.btn { padding: 11px 18px; background: var(--panel-2); border: 1px solid var(--line); }
-.btn:hover:not(:disabled) { background: var(--line); }
-.btn.primary { background: var(--gold); color: #1b1404; border-color: var(--gold); }
-.btn.primary:hover:not(:disabled) { filter: brightness(1.08); background: var(--gold); }
-.btn.go { background: var(--ok); color: #05150d; border-color: var(--ok); font-size: 17px; padding: 12px 24px; }
-.btn.go:hover:not(:disabled) { filter: brightness(1.08); background: var(--ok); }
-
-.layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; align-items: start; }
-@media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } }
-
-/* stage */
-.stage { position: relative; border-radius: 16px; overflow: hidden; border: 1px solid var(--line); background: var(--panel); }
-#gl { display: block; width: 100%; height: auto; }
-.hud { position: absolute; left: 12px; right: 12px; top: 10px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; pointer-events: none; }
-.hud .box { background: rgba(10, 16, 14, 0.78); border: 1px solid var(--line); border-radius: 10px; padding: 6px 12px; display: grid; gap: 0; }
-.hud .k { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
-.hud .v { font-family: var(--font-mono); font-weight: 700; font-size: 20px; font-variant-numeric: tabular-nums; }
-.hud .v.gold { color: var(--gold); }
-.cm { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-weight: 700; font-size: 20px; }
-.tok { min-width: 54px; text-align: center; padding: 3px 10px; border-radius: 8px; color: #fff; font-variant-numeric: tabular-nums; }
-.tok.c { background: var(--chips); }
-.tok.m { background: var(--mult); }
-.caption {
-  position: absolute; left: 12px; right: 12px; bottom: 12px; pointer-events: none;
-  background: rgba(10, 16, 14, 0.86); border: 1px solid var(--line); border-left: 4px solid var(--gold);
-  border-radius: 10px; padding: 10px 14px; font-size: 17px; min-height: 46px;
+/* score column */
+#side {
+  position: fixed; left: 12px; top: calc(12px + env(safe-area-inset-top, 0px)); bottom: 12px; width: 226px; z-index: 5;
+  display: flex; flex-direction: column; gap: 9px; padding: 10px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
 }
-.caption b { color: var(--gold); }
+.blind { border-radius: 12px; padding: 10px; text-align: center; background: linear-gradient(160deg, #2f6fed, #16294d); }
+.blind .name { font-family: var(--font-display); font-size: 20px; }
+.blind .need { margin-top: 6px; background: rgba(0,0,0,0.35); border-radius: 8px; padding: 5px; display: grid; }
+.lbl { font-size: 12px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+.blind .need .lbl { color: #cfe0ff; }
+.blind .need b { font-family: var(--font-mono); font-size: 26px; color: #ff6b5f; }
+.tile { border-radius: 12px; padding: 8px 10px; background: var(--panel-solid); display: grid; justify-items: center; gap: 2px; }
+.tile b { font-family: var(--font-mono); font-size: 28px; font-variant-numeric: tabular-nums; }
+.cm { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 6px; width: 100%; }
+.tok { padding: 4px 8px; border-radius: 9px; font-family: var(--font-mono); font-weight: 700; font-size: 24px; color: #fff; font-variant-numeric: tabular-nums; }
+.tok.c { background: var(--chips); text-align: right; }
+.tok.m { background: var(--mult); text-align: left; }
+.x { color: var(--mult); font-weight: 900; font-size: 20px; }
+.pair2 { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.pair2 .tile b { font-size: 24px; }
+.blue { color: var(--chips); } .red { color: var(--mult); } .gold { color: var(--gold); }
+.side-btns { margin-top: auto; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+.sbtn { border-radius: 10px; padding: 9px 4px; background: #2a3a33; font-size: 14px; box-shadow: 0 4px 0 rgba(0,0,0,0.45); }
+.sbtn:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,0,0,0.45); }
+
+/* actions */
+#actions { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 5; display: flex; gap: 10px; align-items: end; }
+.big { border-radius: 14px; padding: 16px 26px; font-size: 22px; box-shadow: 0 6px 0 rgba(0,0,0,0.5); transition: transform 0.08s; }
+.big:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 3px 0 rgba(0,0,0,0.5); }
+.big.tip { background: var(--ok); color: #04150d; font-size: 26px; padding: 18px 34px; }
+.big.clear { background: #3a4a43; font-size: 17px; padding: 12px 18px; }
+#tipBtn:not(:disabled) { animation: breathe 1.6s ease-in-out infinite; }
+@keyframes breathe { 50% { transform: translateY(-3px); box-shadow: 0 9px 0 rgba(0,0,0,0.5), 0 0 26px rgba(61,220,151,0.5); } }
+
+/* captions & toasts */
+#caption {
+  position: fixed; top: calc(14px + env(safe-area-inset-top, 0px)); left: calc(50% + 125px); transform: translateX(-50%); z-index: 6; width: min(640px, calc(100vw - 290px));
+  background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--gold); border-radius: 12px; padding: 10px 14px; font-size: 16px; line-height: 1.45; pointer-events: none;
+}
+#caption b { color: var(--gold); }
+#caption .c { color: var(--chips); font-weight: 900; } #caption .m { color: var(--mult); font-weight: 900; }
+#skip { position: fixed; z-index: 7; top: calc(14px + env(safe-area-inset-top, 0px)); right: 14px; border-radius: 10px; padding: 9px 14px; background: #3a4a43; font-size: 14px; }
+
+/* 3D-anchored labels */
+#labels { position: fixed; inset: 0; pointer-events: none; z-index: 4; overflow: hidden; }
+.anchor { position: absolute; left: 0; top: 0; will-change: transform; }
+.badge { display: grid; gap: 2px; justify-items: center; }
+.badge span { font-family: var(--font-mono); font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 5px; white-space: nowrap; background: rgba(8,14,12,0.85); }
+.badge .ok { color: var(--ok); border: 1px solid var(--ok); }
+.badge .wild { color: var(--special); border: 1px solid var(--special); }
+.badge .stop { color: #fff; background: var(--mult); }
+.badge .thru { color: var(--muted); border: 1px solid var(--line); }
+.tablelbl { font-size: 12px; letter-spacing: 0.12em; color: rgba(220, 240, 230, 0.55); font-weight: 700; white-space: nowrap; }
 .pop {
-  position: absolute; transform: translate(-50%, -100%); pointer-events: none; white-space: nowrap;
-  font-family: var(--font-mono); font-weight: 700; font-size: 15px; padding: 3px 9px; border-radius: 8px; color: #fff;
-  animation: rise 1.4s ease-out forwards; box-shadow: 0 3px 0 rgba(0,0,0,0.35);
+  position: absolute; transform: translate(-50%, -50%); white-space: nowrap; font-family: var(--font-mono); font-weight: 700; font-size: 17px;
+  padding: 3px 10px; border-radius: 9px; color: #fff; animation: rise 1.25s cubic-bezier(.2,.9,.3,1) forwards; box-shadow: 0 4px 0 rgba(0,0,0,0.4);
 }
-.pop.c { background: var(--chips); }
-.pop.m { background: var(--mult); }
-.pop.x { background: var(--mult); font-size: 20px; outline: 2px solid #fff; }
-.pop.s { background: var(--special); color: #160a2b; }
-.pop.bad { background: #3a1513; color: #ffb3ad; border: 1px solid var(--mult); }
-@keyframes rise { 0% { opacity: 0; transform: translate(-50%, -60%) scale(0.6); } 15% { opacity: 1; transform: translate(-50%, -110%) scale(1.1); } 30% { transform: translate(-50%, -120%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -190%); } }
-.banner {
-  position: absolute; inset: 0; display: grid; place-items: center; text-align: center; background: rgba(8, 12, 10, 0.72);
+.pop.c { background: var(--chips); } .pop.m { background: var(--mult); } .pop.s { background: var(--special); color: #170a2c; }
+.pop.x { background: var(--mult); font-size: 26px; outline: 3px solid #fff; }
+.pop.bad { background: #2a0d0b; color: #ffb3ad; border: 2px solid var(--mult); font-size: 18px; }
+@keyframes rise { 0% { opacity: 0; transform: translate(-50%, -20%) scale(0.4); } 15% { opacity: 1; transform: translate(-50%, -80%) scale(1.15); } 30% { transform: translate(-50%, -95%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -190%); } }
+.total {
+  position: fixed; left: calc(50% + 125px); top: 40%; transform: translate(-50%, -50%); z-index: 6; pointer-events: none; text-align: center;
+  font-family: var(--font-mono); font-weight: 700; font-size: clamp(40px, 8vw, 84px); color: #fff; text-shadow: 0 0 24px var(--gold), 0 6px 0 rgba(0,0,0,0.5);
+  animation: slam 1.5s ease forwards;
 }
-.banner .inner { display: grid; gap: 10px; justify-items: center; padding: 20px; }
-.banner h2 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: clamp(30px, 5vw, 48px); }
-.banner p { margin: 0; color: var(--muted); font-size: 17px; max-width: 46ch; }
+@keyframes slam { 0% { transform: translate(-50%, -50%) scale(2.4); opacity: 0; } 18% { transform: translate(-50%, -50%) scale(0.92); opacity: 1; } 30% { transform: translate(-50%, -50%) scale(1); } 75% { opacity: 1; } 100% { transform: translate(-80vw, -50%) scale(0.3); opacity: 0; } }
+.bump { animation: bump 0.25s ease-out; }
+@keyframes bump { 40% { transform: scale(1.22); } }
 
-/* builder */
-.builder { display: grid; gap: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
-.row-h { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
-.row-h h3 { margin: 0; font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-.row-h .hint { font-size: 14px; color: var(--muted); }
-.chain { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 64px; padding: 8px; border-radius: 12px; background: var(--bg); border: 1px dashed var(--line); }
-.chain .empty { color: var(--muted); font-size: 15px; padding: 0 6px; }
-.link { font-family: var(--font-mono); font-size: 11px; font-weight: 700; padding: 3px 6px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
-.link.ok { color: var(--ok); border: 1px solid var(--ok); }
-.link.wild { color: var(--special); border: 1px solid var(--special); }
-.link.thru { color: var(--muted); border: 1px solid var(--line); }
-.link.stop { color: #fff; background: var(--mult); }
-.mini {
-  display: inline-grid; place-items: center; width: 40px; height: 54px; border-radius: 7px; background: var(--card); color: var(--card-ink);
-  font-family: var(--font-mono); font-weight: 700; font-size: 15px; line-height: 1.05; padding: 0; border: 2px solid transparent;
-}
-.mini.sp { background: var(--panel-2); color: var(--special); border-color: var(--special); font-size: 11px; width: 54px; }
-.mini.broken { border-color: var(--mult); }
-.hand, .specials { display: flex; flex-wrap: wrap; gap: 8px; }
-.pc {
-  width: 58px; height: 80px; border-radius: 9px; background: var(--card); color: var(--card-ink); display: grid; align-content: space-between;
-  padding: 6px 7px; font-family: var(--font-mono); font-weight: 700; font-size: 18px; text-align: left; box-shadow: 0 4px 0 rgba(0,0,0,0.35);
-  transition: transform 0.12s;
-}
-.pc:hover:not(:disabled) { transform: translateY(-4px); }
-.pc .s { font-size: 26px; text-align: right; line-height: 1; }
-.pc.used { opacity: 0.25; transform: none; }
-.spc {
-  display: grid; gap: 2px; text-align: left; padding: 9px 12px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--special); min-width: 0; flex: 1 1 150px;
-}
-.spc b { color: var(--special); font-size: 15px; }
-.spc span { font-size: 13px; color: var(--muted); font-weight: 400; }
-.spc.used { opacity: 0.3; }
-.actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-.actions .note { font-size: 14px; color: var(--muted); }
+/* screens */
+.screen { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 16px; background: radial-gradient(ellipse at center, rgba(8,14,12,0.55), rgba(8,14,12,0.92)); }
+.card-ui { width: min(560px, 100%); max-height: calc(100% - 20px); overflow: auto; display: grid; gap: 16px; justify-items: center; text-align: center; padding: 26px 22px; border-radius: 20px; background: var(--panel-solid); border: 1px solid var(--line); box-shadow: 0 20px 60px rgba(0,0,0,0.6); animation: pop-in 0.35s cubic-bezier(.2,1.4,.4,1); }
+@keyframes pop-in { from { transform: translateY(40px) scale(0.92); opacity: 0; } }
+.logo { font-family: var(--font-display); font-size: clamp(54px, 12vw, 96px); line-height: 0.9; letter-spacing: 0.02em; }
+.logo span { color: var(--gold); }
+.logo-sub { font-family: var(--font-display); font-size: 22px; color: var(--muted); margin-top: -6px; }
+.card-ui p { margin: 0; color: var(--muted); font-size: 17px; line-height: 1.5; max-width: 42ch; }
+.menu { display: grid; gap: 10px; width: min(320px, 100%); }
+.menu .big { width: 100%; }
+.big.gold { background: var(--gold); color: #1d1503; }
+.big.dark { background: #33443d; font-size: 18px; }
+.langs { display: flex; gap: 6px; }
+.langs button { border-radius: 9px; padding: 7px 14px; background: #2a3a33; font-size: 14px; }
+.langs button[aria-pressed="true"] { background: var(--gold); color: #1d1503; }
+.result h2 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: clamp(34px, 7vw, 54px); }
+.rules { display: grid; gap: 10px; text-align: left; width: 100%; font-size: 15px; }
+.rules h3 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 22px; color: var(--gold); text-align: center; }
+.rules .r { display: grid; grid-template-columns: 70px 1fr; gap: 10px; align-items: baseline; }
+.rules .r span:first-child { font-family: var(--font-mono); font-size: 12px; font-weight: 700; padding: 2px 6px; border-radius: 5px; text-align: center; }
+.rules .ok { color: var(--ok); border: 1px solid var(--ok); } .rules .stop { background: var(--mult); color: #fff; } .rules .wild { color: var(--special); border: 1px solid var(--special); }
+.rules .c { color: var(--chips); font-weight: 900; } .rules .m { color: var(--mult); font-weight: 900; }
 
-/* rules */
-aside.rules { display: grid; gap: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
-aside h3 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 20px; color: var(--gold); }
-aside h4 { margin: 0; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-aside ol, aside ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 15px; }
-.rule { display: grid; grid-template-columns: 64px 1fr; gap: 8px; align-items: baseline; font-size: 15px; }
-.rule .link { justify-self: start; }
-.c-t { color: var(--chips); font-weight: 700; }
-.m-t { color: var(--mult); font-weight: 700; }
-.g-t { color: var(--gold); font-weight: 700; }
-.why { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; display: grid; gap: 6px; }
-@media (max-width: 600px) {
-  .hud { position: static; padding: 10px 10px 0; }
-  .hud .box { padding: 4px 8px; }
-  .hud .v, .cm { font-size: 16px; }
-  .tok { min-width: 40px; }
-  .caption { position: static; margin: 0 10px 10px; font-size: 15px; }
-  .stage { display: grid; }
-  #gl { order: 1; }
-  .hud { order: 0; }
-  .caption { order: 2; }
+/* phones */
+@media (max-width: 760px), (max-height: 520px) {
+  #side { left: 6px; right: 6px; top: calc(6px + env(safe-area-inset-top, 0px)); bottom: auto; width: auto; flex-direction: row; flex-wrap: wrap; gap: 5px; padding: 6px; }
+  .blind { flex: 1 1 120px; padding: 5px 8px; display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .blind .name { font-size: 14px; }
+  .blind .need { margin: 0; padding: 2px 8px; }
+  .blind .need .lbl { display: none; }
+  .blind .need b { font-size: 18px; }
+  .tile { padding: 3px 8px; flex: 1 1 70px; }
+  .tile b { font-size: 18px; }
+  #scoreTile .lbl, #tipTile .lbl { display: none; }
+  .tok { font-size: 16px; padding: 2px 6px; }
+  .pair2 { flex: 1 1 120px; gap: 5px; }
+  .pair2 .tile b { font-size: 16px; }
+  .side-btns { margin: 0; flex: 0 0 auto; grid-template-columns: repeat(3, 38px); }
+  .sbtn { padding: 6px 2px; font-size: 13px; }
+  .hide-sm { display: none; }
+  #caption { left: 50%; top: auto; bottom: calc(86px + env(safe-area-inset-bottom, 0px)); width: calc(100vw - 20px); font-size: 14px; padding: 8px 10px; }
+  #actions { left: 50%; right: auto; transform: translateX(-50%); bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
+  .big.tip { font-size: 20px; padding: 13px 26px; }
+  .big.clear { font-size: 14px; padding: 10px 12px; }
+  .total { left: 50%; }
+  #skip { top: auto; bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
 }
-@media (prefers-reduced-motion: reduce) { .pop { animation-duration: 0.01s; } .pc { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .pop, .total, .card-ui { animation-duration: 0.01s; } #tipBtn { animation: none !important; } }
 </style>
 </head>
 <body>
 
 
-<div class="wrap">
-  <header>
-    <div class="brand">
-      <h1>CAS<span>CADE</span></h1>
-      <p>Stand your cards in a line like dominoes and tip the first one. Each card knocks over the next only if they share something. Every card that falls scores <span class="c-t">chips</span> × <span class="m-t">mult</span>.</p>
-    </div>
-    <div class="modes">
-      <button class="btn primary" id="btnWatch">▶ Watch an example</button>
-      <button class="btn" id="btnPlay">Deal a new game</button>
-    </div>
-  </header>
+<canvas id="gl" aria-label="Card table"></canvas>
+<div id="labels"></div>
 
-  <div class="layout">
-    <div style="display:grid;gap:14px;min-width:0">
-      <div class="stage" id="stage">
-        <canvas id="gl" aria-label="3D table showing the domino chain of cards"></canvas>
-        <div class="hud">
-          <div class="box"><span class="k">Target</span><span class="v" id="hTarget">4,000</span></div>
-          <div class="box"><span class="k">Score</span><span class="v gold" id="hScore">0</span></div>
-          <div class="box"><span class="k">This tip</span><div class="cm"><span class="tok c" id="hChips">0</span>×<span class="tok m" id="hMult">1</span></div></div>
-          <div class="box"><span class="k">Tips left</span><span class="v" id="hTips">3</span></div>
-        </div>
-        <div class="caption" id="caption" aria-live="polite">Press <b>Watch an example</b> to see one tip explained, or build your own chain below.</div>
-        <div id="pops"></div>
-        <div class="banner" id="banner" hidden><div class="inner"><h2 id="bTitle"></h2><p id="bText"></p><button class="btn primary" id="bBtn">Deal a new game</button></div></div>
-      </div>
-
-      <div class="builder">
-        <div class="row-h"><h3>Your chain</h3><span class="hint">Click a piece in the chain to take it out</span></div>
-        <div class="chain" id="chain"></div>
-        <div class="row-h"><h3>Your hand</h3><span class="hint">Click a card to stand it at the end of the chain</span></div>
-        <div class="hand" id="hand"></div>
-        <div class="row-h"><h3>Special pieces</h3><span class="hint">Each can be used once per tip</span></div>
-        <div class="specials" id="specials"></div>
-        <div class="actions">
-          <button class="btn go" id="btnTip">Tip it!</button>
-          <button class="btn" id="btnClear">Clear chain</button>
-          <span class="note" id="note"></span>
-        </div>
-      </div>
-    </div>
-
-    <aside class="rules" aria-label="Rules">
-      <h3>The rules on one card</h3>
-      <div style="display:grid;gap:8px">
-        <h4>A card knocks the next one over if they share:</h4>
-        <div class="rule"><span class="link ok">pair</span><span>the same rank: <span class="m-t">+4 mult</span></span></div>
-        <div class="rule"><span class="link ok">step</span><span>ranks one apart (6→7): <span class="m-t">+2 mult</span>. Three steps in a row add <span class="m-t">+3</span> more each.</span></div>
-        <div class="rule"><span class="link ok">suit</span><span>the same suit: <span class="c-t">+10 chips</span></span></div>
-        <div class="rule"><span class="link stop">✕ stop</span><span>nothing shared: the chain stops there, and everything after it scores nothing.</span></div>
-      </div>
-      <div style="display:grid;gap:8px">
-        <h4>Every card that falls also adds</h4>
-        <p style="margin:0;font-size:15px">its value in <span class="c-t">chips</span>: 2–10 at face value, J/Q/K 10, A 11.</p>
-      </div>
-      <div style="display:grid;gap:8px">
-        <h4>Special pieces</h4>
-        <div class="rule"><span class="link wild">bridge</span><span>Wild: the next card always links.</span></div>
-        <div class="rule"><span class="link wild">loop</span><span>Replays the last two cards' scores.</span></div>
-        <div class="rule"><span class="link wild">ramp</span><span><span class="m-t">×2 mult</span> at the moment it falls. Put it late.</span></div>
-      </div>
-      <div class="why">
-        <span><b class="g-t">Goal:</b> reach the target in 3 tips. After each tip you draw back up to 8 cards.</span>
-        <span><b class="g-t">Why it's Balatro:</b> same chips × mult, same "add first, multiply last" skill. You see every link before you tip, so a broken chain is always your call.</span>
-      </div>
-    </aside>
+<aside id="side" aria-label="Score">
+  <div class="blind"><div class="name" data-t="blind"></div><div class="need"><span class="lbl" data-t="atLeast"></span><b id="hTarget">4,000</b></div></div>
+  <div class="tile" id="scoreTile"><span class="lbl" data-t="roundScore"></span><b id="hScore" class="gold">0</b></div>
+  <div class="tile" id="tipTile"><span class="lbl" data-t="thisTip"></span><div class="cm"><span class="tok c" id="hChips">0</span><span class="x">×</span><span class="tok m" id="hMult">1</span></div></div>
+  <div class="pair2">
+    <div class="tile"><span class="lbl" data-t="tips"></span><b id="hTips" class="blue">3</b></div>
+    <div class="tile"><span class="lbl" data-t="deck"></span><b id="hDeck">44</b></div>
   </div>
+  <div class="side-btns">
+    <button class="sbtn" id="rulesBtn" data-t="rulesShort"></button>
+    <button class="sbtn" id="langBtn">中</button>
+    <button class="sbtn" id="soundBtn" aria-label="Sound">♪</button>
+  </div>
+</aside>
+
+<div id="caption" hidden></div>
+<button id="skip" hidden data-t="skip"></button>
+
+<div id="actions" hidden>
+  <button class="big clear" id="clearBtn" data-t="clear"></button>
+  <button class="big tip" id="tipBtn" data-t="tip"></button>
+</div>
+
+<div class="screen" id="title">
+  <div class="card-ui">
+    <div><div class="logo">CAS<span>CADE</span></div><div class="logo-sub" data-t="zhName"></div></div>
+    <p data-t="pitch"></p>
+    <div class="menu">
+      <button class="big gold" id="playBtn" data-t="play"></button>
+      <button class="big dark" id="howBtn" data-t="how"></button>
+    </div>
+    <div class="langs" role="group" aria-label="Language"><button id="lEn" aria-pressed="true">English</button><button id="lZh" aria-pressed="false">简体中文</button></div>
+  </div>
+</div>
+
+<div class="screen" id="result" hidden>
+  <div class="card-ui result"><h2 id="rTitle"></h2><p id="rText"></p><div class="menu"><button class="big gold" id="againBtn" data-t="again"></button><button class="big dark" id="menuBtn" data-t="menu"></button></div></div>
+</div>
+
+<div class="screen" id="rulesScr" hidden>
+  <div class="card-ui"><div class="rules" id="rulesBody"></div><div class="menu"><button class="big gold" id="rulesClose" data-t="back"></button></div></div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -234,23 +210,111 @@ aside ol, aside ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; fon
 (function () {
   'use strict';
   const $ = (id) => document.getElementById(id);
-  const fmt = (n) => Math.round(n).toLocaleString('en-US');
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const SPEED = REDUCE ? 0.35 : 1;
+  const fmt = (n) => Math.round(n).toLocaleString('en-US');
+  const fmtM = (m) => (m % 1 ? m.toFixed(1) : fmt(m));
 
-  /* ───────── rules (pure) ───────── */
+  /* ───────────── localisation ───────────── */
+  const I18N = {
+    en: {
+      zhName: 'chain-reaction poker', pitch: 'Stand your cards in a line and tip the first one. A card only knocks over the next if they share something. Every card that falls scores chips × mult.',
+      play: 'Play', how: 'How to play', again: 'Play again', menu: 'Main menu', back: 'Back to the table', skip: 'Skip ▸',
+      blind: 'Small Blind', atLeast: 'Score at least', roundScore: 'Round score', thisTip: 'This tip', tips: 'Tips', deck: 'Deck', rulesShort: 'Rules',
+      tip: 'TIP IT!', clear: 'Clear', handLbl: 'YOUR HAND · click to stand a card', spLbl: 'SPECIAL PIECES · once per tip',
+      pair: 'PAIR +4', step: 'STEP +2', suit: 'SUIT +10', run: 'RUN +3', stop: '✕ STOP', wild: 'WILD', thru: '→',
+      popMult: (n) => `+${n} mult`, popX: '×2 MULT', popNo: '✕ no link', popWild: '⇄ wild', popLoop: (c, m) => `↺ +${c} / +${m}`,
+      bridge: ['BRIDGE', 'Next card always links'], loop: ['LOOP', 'Replays last 2 cards'], ramp: ['RAMP', '×2 mult when it falls'],
+      hint: 'Click cards in your hand to stand them in a line. Green badges are links. Then press <b>TIP IT!</b>',
+      hintStop: 'The red <b>✕ STOP</b> badge means the chain will stop there. Cards after it won\'t score.',
+      tipping: '<b>Tipping…</b>',
+      broke: (a, b) => `<b>Chain stopped.</b> ${a} and ${b} share nothing, so the rest never falls.`,
+      summary: (c, m, t, full) => `<span class="c">${c} chips</span> × <span class="m">${m} mult</span> = <b>${t}</b>${full ? ' · full chain!' : ''}`,
+      next: (s, tg, n) => `Round score <b>${s}</b> / ${tg}. ${n} tip${n === 1 ? '' : 's'} left. New cards drawn.`,
+      win: 'Blind cleared!', winText: (s, tg) => `You scored ${s} against ${tg}. In the full game, the shop opens now.`,
+      lose: (n) => `Short by ${n}`, loseText: (s, tg) => `You scored ${s} of ${tg}. One more link would have done it.`,
+      tut: [
+        'You hold <b>8 cards</b>. Each tip, you stand some of them in a line on the table.',
+        '<b>5♥</b> goes first. It starts the chain.',
+        '<b>6♥</b> links to 5♥ two ways: one rank apart (<b>STEP</b>) and same suit (<b>SUIT</b>).',
+        '<b>6♣</b> links to 6♥ by rank: a <b>PAIR</b>.',
+        '<b>K♠</b> shares nothing with 6♣. See the red <b>✕ STOP</b>? The chain would stop here.',
+        'So take it back. Choosing the order is the whole puzzle.',
+        '<b>7♣</b>: step and same suit. Three steps in a row also add a <b>RUN</b> bonus.',
+        'A <b>LOOP</b> replays the last two cards\' scores when it falls.',
+        '<b>8♣</b> still has to link to 7♣ across the Loop.',
+        '<b>RAMP</b> doubles the mult when it falls, so put it last: add first, multiply last.',
+        'Ready. <b>Tip it!</b>',
+      ],
+      tutCard: (p, base, tags) => `<b>${p}</b> falls: <span class="c">+${base} chips</span>${tags ? ' · links: <b>' + tags + '</b>' : ' · first card'}`,
+      tutLoop: (c, m) => `<b>LOOP</b> replays two cards: <span class="c">+${c} chips</span>, <span class="m">+${m} mult</span>`,
+      tutRamp: (m) => `<b>RAMP</b>: mult doubles to <span class="m">${m}</span>, multiplying everything before it.`,
+      tutEnd: (s) => `One tip scored <b>${s}</b>. A real round gives you <b>3 tips</b> to reach 4,000 with random cards. Your turn!`,
+      rules: `<h3>Rules</h3>
+        <div class="r"><span class="ok">PAIR</span><span>same rank: <span class="m">+4 mult</span></span></div>
+        <div class="r"><span class="ok">STEP</span><span>ranks one apart (6→7): <span class="m">+2 mult</span>. Three in a row add <span class="m">+3</span> more each (RUN).</span></div>
+        <div class="r"><span class="ok">SUIT</span><span>same suit: <span class="c">+10 chips</span></span></div>
+        <div class="r"><span class="stop">✕ STOP</span><span>nothing shared: the chain stops; later cards score nothing.</span></div>
+        <div class="r"><span class="wild">BRIDGE</span><span>the next card always links.</span></div>
+        <div class="r"><span class="wild">LOOP</span><span>replays the last two cards' scores.</span></div>
+        <div class="r"><span class="wild">RAMP</span><span><span class="m">×2 mult</span> when it falls. Put it late.</span></div>
+        <p>Every falling card also adds its value in <span class="c">chips</span> (2–10, J/Q/K 10, A 11). Reach the target in 3 tips.</p>`,
+    },
+    zh: {
+      zhName: '连环倒', pitch: '把手牌立成一排，推倒第一张。相邻两张牌必须有共同点，前一张才能撞倒后一张。每倒下一张牌，都会按 筹码 × 倍率 计分。',
+      play: '开始游戏', how: '玩法演示', again: '再来一局', menu: '主菜单', back: '回到牌桌', skip: '跳过 ▸',
+      blind: '小盲注', atLeast: '至少得分', roundScore: '本轮得分', thisTip: '本次推倒', tips: '次数', deck: '牌库', rulesShort: '规则',
+      tip: '推倒！', clear: '清空', handLbl: '手牌 · 点击把牌立起来', spLbl: '特殊牌 · 每次推倒限用一次',
+      pair: '对子 +4', step: '顺连 +2', suit: '同花 +10', run: '连顺 +3', stop: '✕ 断链', wild: '万能', thru: '→',
+      popMult: (n) => `+${n} 倍率`, popX: '倍率 ×2', popNo: '✕ 断链', popWild: '⇄ 万能', popLoop: (c, m) => `↺ +${c} / +${m}`,
+      bridge: ['桥接', '下一张必定相连'], loop: ['回放', '重算前两张牌'], ramp: ['翻倍', '倒下时倍率 ×2'],
+      hint: '点击手牌，把牌立成一排。绿色标签表示相连。然后按 <b>推倒！</b>',
+      hintStop: '红色 <b>✕ 断链</b> 表示连锁会在这里停下，后面的牌不会得分。',
+      tipping: '<b>推倒中……</b>',
+      broke: (a, b) => `<b>连锁中断。</b>${a} 和 ${b} 没有任何共同点，后面的牌都没有倒下。`,
+      summary: (c, m, t, full) => `<span class="c">${c} 筹码</span> × <span class="m">${m} 倍率</span> = <b>${t}</b>${full ? ' · 完整连锁！' : ''}`,
+      next: (s, tg, n) => `本轮得分 <b>${s}</b> / ${tg}，还剩 ${n} 次推倒。已补充新牌。`,
+      win: '过关！', winText: (s, tg) => `你得了 ${s} 分，目标是 ${tg} 分。完整版游戏中，接下来会打开商店。`,
+      lose: (n) => `还差 ${n} 分`, loseText: (s, tg) => `你得了 ${s} / ${tg} 分。再多连一张就够了。`,
+      tut: [
+        '你手里有 <b>8 张牌</b>。每次推倒前，把其中几张立成一排。',
+        '先放 <b>5♥</b>，它是连锁的起点。',
+        '<b>6♥</b> 和 5♥ 有两种连接：点数相差 1（<b>顺连</b>），而且花色相同（<b>同花</b>）。',
+        '<b>6♣</b> 和 6♥ 点数相同：<b>对子</b>。',
+        '<b>K♠</b> 和 6♣ 没有任何共同点。看到红色的 <b>✕ 断链</b> 了吗？连锁会在这里停下。',
+        '所以把它拿回来。怎么排列，就是这个游戏的核心。',
+        '<b>7♣</b>：顺连 + 同花。连续三次顺连还会触发 <b>连顺</b> 奖励。',
+        '<b>回放</b> 倒下时，会把前两张牌的得分再算一次。',
+        '<b>8♣</b> 仍需越过回放牌与 7♣ 相连。',
+        '<b>翻倍</b> 倒下时倍率 ×2，所以放在最后：先加，后乘。',
+        '准备好了。<b>推倒！</b>',
+      ],
+      tutCard: (p, base, tags) => `<b>${p}</b> 倒下：<span class="c">+${base} 筹码</span>${tags ? ' · 连接：<b>' + tags + '</b>' : ' · 第一张牌'}`,
+      tutLoop: (c, m) => `<b>回放</b> 重算两张牌：<span class="c">+${c} 筹码</span>，<span class="m">+${m} 倍率</span>`,
+      tutRamp: (m) => `<b>翻倍</b>：倍率翻倍到 <span class="m">${m}</span>，之前累积的全部被放大。`,
+      tutEnd: (s) => `一次推倒得了 <b>${s}</b> 分。正式回合有 <b>3 次</b> 推倒机会，用随机手牌达到 4,000 分。轮到你了！`,
+      rules: `<h3>规则</h3>
+        <div class="r"><span class="ok">对子</span><span>点数相同：<span class="m">+4 倍率</span></span></div>
+        <div class="r"><span class="ok">顺连</span><span>点数相差 1（如 6→7）：<span class="m">+2 倍率</span>。连续三次起每次再 <span class="m">+3</span>（连顺）。</span></div>
+        <div class="r"><span class="ok">同花</span><span>花色相同：<span class="c">+10 筹码</span></span></div>
+        <div class="r"><span class="stop">✕ 断链</span><span>没有共同点：连锁停止，后面的牌不得分。</span></div>
+        <div class="r"><span class="wild">桥接</span><span>下一张牌必定相连。</span></div>
+        <div class="r"><span class="wild">回放</span><span>把前两张牌的得分再算一次。</span></div>
+        <div class="r"><span class="wild">翻倍</span><span>倒下时 <span class="m">倍率 ×2</span>，越晚放越强。</span></div>
+        <p>每张倒下的牌还会按点数加 <span class="c">筹码</span>（2–10 按面值，J/Q/K 为 10，A 为 11）。3 次推倒内达到目标分。</p>`,
+    },
+  };
+  let lang = 'en';
+  try { lang = localStorage.getItem('cascade-lang') || (/^zh/i.test(navigator.language) ? 'zh' : 'en'); } catch (e) { lang = /^zh/i.test(navigator.language) ? 'zh' : 'en'; }
+  const L = () => I18N[lang];
+
+  /* ───────────── rules (pure) ───────────── */
   const SUITS = { s: '♠', h: '♥', c: '♣', d: '♦' };
-  const SUIT_COLOR = { s: '#24305e', h: '#d7263d', c: '#14806f', d: '#e8781e' };
+  const SUIT_COLOR = { s: '#24305e', h: '#d7263d', c: '#13806e', d: '#e8781e' };
   const RL = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
   const rl = (r) => RL[r] || String(r);
   const val = (r) => (r === 14 ? 11 : r >= 10 ? 10 : r);
-  const label = (p) => (p.sp ? SPECIALS[p.sp].name : rl(p.r) + SUITS[p.s]);
-  const SPECIALS = {
-    bridge: { name: 'BRIDGE', icon: '⇄', text: 'Next card always links' },
-    loop: { name: 'LOOP', icon: '↺', text: 'Replay last two cards' },
-    ramp: { name: 'RAMP', icon: '×2', text: '×2 mult when it falls' },
-  };
+  const cardName = (p) => (p.sp ? L()[p.sp][0] : rl(p.r) + SUITS[p.s]);
   function linksOf(a, b) {
     const l = [];
     if (a.r === b.r) l.push('pair');
@@ -258,15 +322,15 @@ aside ol, aside ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; fon
     if (a.s === b.s) l.push('suit');
     return l;
   }
-  // For the chain preview: what links each piece to the one before it?
   function previewLinks(chain) {
     let prev = null, wild = false;
     return chain.map((p, i) => {
-      if (i === 0) { if (p.sp === 'bridge') wild = true; if (!p.sp) prev = p; return { kind: 'first' }; }
-      if (p.sp) { if (p.sp === 'bridge') { wild = true; } return { kind: 'thru' }; }
-      let res;
-      if (wild || !prev) res = { kind: 'wild' };
-      else { const l = linksOf(prev, p); res = l.length ? { kind: 'ok', l } : { kind: 'stop' }; }
+      if (p.sp) { if (p.sp === 'bridge') wild = true; return { kind: i ? 'thru' : 'first' }; }
+      let res = { kind: 'first' };
+      if (i > 0) {
+        if (wild || !prev) res = { kind: 'wild' };
+        else { const l = linksOf(prev, p); res = l.length ? { kind: 'ok', l } : { kind: 'stop' }; }
+      }
       wild = false; prev = p;
       return res;
     });
@@ -278,22 +342,21 @@ aside ol, aside ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; fon
       const p = chain[i];
       if (p.sp === 'ramp') { mult *= 2; ev.push({ i, kind: 'ramp', chips, mult }); continue; }
       if (p.sp === 'loop') {
-        const last = hist.slice(-2);
         let dc = 0, dm = 0;
-        for (const h of last) { dc += h.c; dm += h.m; }
+        for (const h of hist.slice(-2)) { dc += h.c; dm += h.m; }
         chips += dc; mult += dm;
-        ev.push({ i, kind: 'loop', dc, dm, chips, mult, n: last.length });
+        ev.push({ i, kind: 'loop', dc, dm, chips, mult });
         continue;
       }
       if (p.sp === 'bridge') { wild = true; ev.push({ i, kind: 'bridge', chips, mult }); continue; }
       let c = val(p.r), m = 0;
       const tags = [];
       if (prev && !wild) {
-        const L = linksOf(prev, p);
-        if (!L.length) { ev.push({ i, kind: 'break', chips, mult, prev }); return { ev, chips, mult, score: Math.round(chips * mult), broke: i }; }
-        if (L.includes('pair')) { m += 4; tags.push('pair +4'); }
-        if (L.includes('step')) { run++; m += 2; tags.push('step +2'); if (run >= 3) { m += 3; tags.push('run +3'); } } else run = 1;
-        if (L.includes('suit')) { c += 10; tags.push('suit +10'); }
+        const lk = linksOf(prev, p);
+        if (!lk.length) { ev.push({ i, kind: 'break', chips, mult, prev }); return { ev, chips, mult, score: Math.round(chips * mult), broke: i }; }
+        if (lk.includes('pair')) { m += 4; tags.push('pair'); }
+        if (lk.includes('step')) { run++; m += 2; tags.push('step'); if (run >= 3) { m += 3; tags.push('run'); } } else run = 1;
+        if (lk.includes('suit')) { c += 10; tags.push('suit'); }
       } else run = 1;
       wild = false;
       chips += c; mult += m;
@@ -304,427 +367,645 @@ aside ol, aside ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; fon
     return { ev, chips, mult, score: Math.round(chips * mult), broke: -1 };
   }
 
-  /* ───────── audio (starts after first click) ───────── */
-  let ac = null;
-  function blip(freq, dur = 0.09, type = 'triangle', vol = 0.18) {
+  /* ───────────── audio ───────────── */
+  let ac = null, muted = false;
+  function tone(freq, dur = 0.1, type = 'triangle', vol = 0.16, slide = 0) {
+    if (muted) return;
     try {
       ac = ac || new (window.AudioContext || window.webkitAudioContext)();
-      const o = ac.createOscillator(), g = ac.createGain();
-      o.type = type; o.frequency.value = freq;
-      g.gain.setValueAtTime(vol, ac.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + dur);
-      o.connect(g).connect(ac.destination); o.start(); o.stop(ac.currentTime + dur + 0.02);
-    } catch (e) { /* audio is optional */ }
+      const o = ac.createOscillator(), g = ac.createGain(), t0 = ac.currentTime;
+      o.type = type; o.frequency.setValueAtTime(freq, t0);
+      if (slide) o.frequency.exponentialRampToValueAtTime(freq * slide, t0 + dur);
+      g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      o.connect(g).connect(ac.destination); o.start(); o.stop(t0 + dur + 0.02);
+    } catch (e) { /* sound is optional */ }
   }
+  function thud(i) { tone(110 + i * 8, 0.12, 'sine', 0.3, 0.6); tone(300 * Math.pow(1.07, i), 0.09, 'triangle', 0.12); }
 
-  /* ───────── 3D stage ───────── */
+  /* ───────────── three.js scene ───────────── */
   const canvas = $('gl');
-  const stage = $('stage');
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#0f1915');
-  const camera = new THREE.PerspectiveCamera(34, 2, 0.1, 100);
-  const LOOK = new THREE.Vector3(0, 0.42, 0);
+  scene.background = new THREE.Color('#0a110f');
+  scene.fog = new THREE.Fog('#0a110f', 14, 26);
+  const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+  const LOOK = new THREE.Vector3(0, 0, -0.1);
+  const CAM_DIR = new THREE.Vector3(0, 0.86, 0.62).normalize();
+  let camDist = 9;
+  let shake = 0;
 
-  scene.add(new THREE.HemisphereLight(0xdfffee, 0x0b1210, 0.75));
-  const sun = new THREE.DirectionalLight(0xffffff, 0.95);
-  sun.position.set(-3, 6, 5);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(1024, 1024);
-  Object.assign(sun.shadow.camera, { left: -6, right: 6, top: 4, bottom: -4, near: 1, far: 20 });
-  scene.add(sun);
+  scene.add(new THREE.HemisphereLight(0xe8fff2, 0x0a1210, 0.55));
+  const lamp = new THREE.SpotLight(0xfff1d6, 1.25, 30, 0.7, 0.55, 1);
+  lamp.position.set(-1.5, 9, 4);
+  lamp.target.position.set(0, 0, -0.3);
+  lamp.castShadow = true;
+  lamp.shadow.mapSize.set(1024, 1024);
+  scene.add(lamp, lamp.target);
 
-  // felt table
-  function feltTexture() {
-    const c = document.createElement('canvas');
-    c.width = c.height = 512;
-    const g = c.getContext('2d');
-    const grad = g.createRadialGradient(256, 256, 40, 256, 256, 360);
-    grad.addColorStop(0, '#22543f');
-    grad.addColorStop(1, '#0f2a20');
-    g.fillStyle = grad; g.fillRect(0, 0, 512, 512);
-    for (let i = 0; i < 9000; i++) { g.fillStyle = `rgba(255,255,255,${Math.random() * 0.025})`; g.fillRect(Math.random() * 512, Math.random() * 512, 1, 1); }
-    const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t;
+  function canvasTex(w, h, draw) {
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    draw(c.getContext('2d'), w, h);
+    const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; return t;
   }
-  const table = new THREE.Mesh(new THREE.PlaneGeometry(16, 8), new THREE.MeshStandardMaterial({ map: feltTexture(), roughness: 0.95 }));
-  table.rotation.x = -Math.PI / 2;
-  table.receiveShadow = true;
+  const felt = canvasTex(1024, 768, (g, w, h) => {
+    const grad = g.createRadialGradient(w / 2, h * 0.45, 60, w / 2, h / 2, w * 0.62);
+    grad.addColorStop(0, '#256048'); grad.addColorStop(1, '#0c241b');
+    g.fillStyle = grad; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 26000; i++) { g.fillStyle = `rgba(255,255,255,${Math.random() * 0.03})`; g.fillRect(Math.random() * w, Math.random() * h, 1, 1); }
+    g.strokeStyle = 'rgba(255,214,140,0.22)'; g.lineWidth = 3; g.setLineDash([14, 10]);
+    g.strokeRect(70, 300, w - 140, 200);
+  });
+  const table = new THREE.Mesh(new THREE.PlaneGeometry(18, 13.5), new THREE.MeshStandardMaterial({ map: felt, roughness: 0.95 }));
+  table.rotation.x = -Math.PI / 2; table.position.z = -0.3; table.receiveShadow = true;
   scene.add(table);
 
-  // slot markers (where pieces will stand)
-  const SLOTS = 8, GAP = 0.86, CW = 0.72, CH = 1.0, CD = 0.035;
-  const slotX = (i, n) => (i - (n - 1) / 2) * GAP;
-  const slotMarks = [];
-  for (let i = 0; i < SLOTS; i++) {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(CW + 0.06, 0.06), new THREE.MeshBasicMaterial({ color: 0x3a6b55, transparent: true, opacity: 0.6 }));
-    m.rotation.x = -Math.PI / 2; m.position.set(slotX(i, SLOTS), 0.002, 0.04);
-    scene.add(m); slotMarks.push(m);
+  const SLOTS = 8, GAP = 0.94, CW = 0.72, CH = 1.0, CD = 0.03;
+  const LANE_Z = 0.35, HAND_Z = 2.65, SP_Z = -2.35;
+  let portrait = false;
+  // landscape: one lane of 8. portrait: two lanes of 4 so cards stay big on phones.
+  function slotPos(i) {
+    if (!portrait) return { x: (i - (SLOTS - 1) / 2) * GAP, z: LANE_Z };
+    const row = i < 4 ? 0 : 1;
+    return { x: ((i % 4) - 1.5) * GAP, z: row === 0 ? LANE_Z - 1.45 : LANE_Z + 0.05 };
+  }
+  const handZ = () => (portrait ? HAND_Z + 0.45 : HAND_Z);
+  const spZ = () => (portrait ? -3.05 : SP_Z);
+  const laneMarks = [];
+  function buildLanes() {
+    laneMarks.forEach((m) => scene.remove(m)); laneMarks.length = 0;
+    for (let i = 0; i < SLOTS; i++) {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(CW + 0.08, CH + 0.04), new THREE.MeshBasicMaterial({ color: 0xffd68c, transparent: true, opacity: 0.07 }));
+      const sp = slotPos(i);
+      m.rotation.x = -Math.PI / 2; m.position.set(sp.x, 0.003, sp.z - CH / 2 - 0.02);
+      scene.add(m); laneMarks.push(m);
+    }
   }
 
   const texCache = new Map();
-  function faceTexture(p) {
-    const key = p.sp || p.r + p.s;
+  function faceTex(p) {
+    const key = p.sp ? p.sp + ':' + lang : p.r + p.s;
     if (texCache.has(key)) return texCache.get(key);
-    const c = document.createElement('canvas');
-    c.width = 256; c.height = 356;
-    const g = c.getContext('2d');
-    const rr = (x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
-    g.textAlign = 'center'; g.textBaseline = 'middle';
-    if (p.sp) {
-      const s = SPECIALS[p.sp];
-      g.fillStyle = '#1b1430'; rr(0, 0, 256, 356, 22); g.fill();
-      g.strokeStyle = '#b98cff'; g.lineWidth = 8; rr(10, 10, 236, 336, 16); g.stroke();
-      g.fillStyle = '#b98cff'; g.font = '700 118px "JetBrains Mono", monospace'; g.fillText(s.icon, 128, 140);
-      g.fillStyle = '#ffffff'; g.font = '40px Bungee, Impact, sans-serif'; g.fillText(s.name, 128, 250);
-      g.fillStyle = '#cdbbff'; g.font = '700 22px "Atkinson Hyperlegible", sans-serif'; g.fillText(s.text, 128, 300);
-    } else {
-      const col = SUIT_COLOR[p.s];
-      g.fillStyle = '#f6f1e4'; rr(0, 0, 256, 356, 22); g.fill();
-      g.strokeStyle = 'rgba(0,0,0,0.15)'; g.lineWidth = 5; rr(6, 6, 244, 344, 18); g.stroke();
-      g.fillStyle = col;
-      g.font = '700 62px "JetBrains Mono", monospace'; g.fillText(rl(p.r), 46, 50);
-      g.font = '46px sans-serif'; g.fillText(SUITS[p.s] + '︎', 46, 102);
-      g.font = '150px sans-serif'; g.fillText(SUITS[p.s] + '︎', 128, 205);
-      g.save(); g.translate(256, 356); g.rotate(Math.PI);
-      g.font = '700 62px "JetBrains Mono", monospace'; g.fillText(rl(p.r), 46, 50);
-      g.restore();
-    }
-    const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; t.anisotropy = 4;
+    const t = canvasTex(256, 356, (g) => {
+      const rr = (x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      if (p.sp) {
+        const [name, text] = L()[p.sp];
+        g.fillStyle = '#1b1430'; rr(0, 0, 256, 356, 22); g.fill();
+        g.strokeStyle = '#b98cff'; g.lineWidth = 8; rr(10, 10, 236, 336, 16); g.stroke();
+        g.fillStyle = '#b98cff'; g.font = '700 110px "JetBrains Mono", monospace';
+        g.fillText({ bridge: '⇄', loop: '↺', ramp: '×2' }[p.sp], 128, 130);
+        g.fillStyle = '#fff'; g.font = lang === 'zh' ? '900 52px "Noto Sans SC", sans-serif' : '40px Bungee, Impact, sans-serif';
+        g.fillText(name, 128, 240);
+        g.fillStyle = '#d6c6ff'; g.font = '700 21px "Noto Sans SC", sans-serif';
+        g.fillText(text, 128, 296);
+      } else {
+        const col = SUIT_COLOR[p.s];
+        g.fillStyle = '#f6f1e4'; rr(0, 0, 256, 356, 22); g.fill();
+        g.strokeStyle = 'rgba(0,0,0,0.16)'; g.lineWidth = 5; rr(6, 6, 244, 344, 18); g.stroke();
+        g.fillStyle = col;
+        g.font = '700 64px "JetBrains Mono", monospace'; g.fillText(rl(p.r), 48, 52);
+        g.font = '48px sans-serif'; g.fillText(SUITS[p.s] + '︎', 48, 106);
+        g.font = '150px sans-serif'; g.fillText(SUITS[p.s] + '︎', 128, 210);
+        g.save(); g.translate(256, 356); g.rotate(Math.PI);
+        g.font = '700 64px "JetBrains Mono", monospace'; g.fillText(rl(p.r), 48, 52);
+        g.restore();
+      }
+    });
     texCache.set(key, t);
     return t;
   }
-  const backTex = (() => {
-    const c = document.createElement('canvas'); c.width = 128; c.height = 178;
-    const g = c.getContext('2d'); g.fillStyle = '#9e1f2a'; g.fillRect(0, 0, 128, 178);
+  const backTex = canvasTex(128, 178, (g) => {
+    g.fillStyle = '#9e1f2a'; g.fillRect(0, 0, 128, 178);
     g.strokeStyle = 'rgba(255,210,150,0.35)'; g.lineWidth = 3;
     for (let i = -178; i < 300; i += 16) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i + 178, 178); g.stroke(); }
-    const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t;
-  })();
-  const edgeMat = new THREE.MeshStandardMaterial({ color: 0xe8e2d2, roughness: 0.6 });
+  });
+  const edgeMat = new THREE.MeshStandardMaterial({ color: 0xe9e3d3, roughness: 0.6 });
+  const backMat = new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.7 });
   const cardGeo = new THREE.BoxGeometry(CW, CH, CD);
 
-  // A standing piece: pivot sits at the bottom-right edge so the card tips to the right.
-  let pieces = [];
-  function makePiece(p, i, n) {
-    const pivot = new THREE.Group();
-    const front = new THREE.MeshStandardMaterial({ map: faceTexture(p), roughness: 0.5, emissive: 0x000000 });
-    const back = new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.6 });
-    const mesh = new THREE.Mesh(cardGeo, [edgeMat, edgeMat, edgeMat, edgeMat, front, back]);
-    mesh.castShadow = true;
-    mesh.position.set(-CW / 2, CH / 2, 0);
-    pivot.add(mesh);
-    pivot.position.set(slotX(i, n) + CW / 2, 0, 0);
-    pivot.userData = { rot: 0, target: 0, y: 2.2, ty: 0, shake: 0, front };
-    pivot.position.y = 2.2;
-    scene.add(pivot);
-    return pivot;
-  }
-  function syncPieces(chain) {
-    pieces.forEach((pv) => scene.remove(pv));
-    pieces = chain.map((p, i) => makePiece(p, i, SLOTS));
-    pieces.forEach((pv) => { pv.position.y = 0; pv.userData.y = 0; });
-  }
-  function addPiece(p, idx) {
-    const pv = makePiece(p, idx, SLOTS);
-    pieces.push(pv);
-    blip(520 + idx * 40, 0.06, 'square', 0.06);
+  /* Every piece pivots on its bottom-back edge, so rotX 0 = standing, −π/2 = lying face-up behind its slot, and the hand leans back like cards in a stand. */
+  class Piece {
+    constructor(p) {
+      this.p = p;
+      this.pivot = new THREE.Group();
+      this.front = new THREE.MeshStandardMaterial({ map: faceTex(p), roughness: 0.45, emissive: new THREE.Color(0x000000) });
+      this.mesh = new THREE.Mesh(cardGeo, [edgeMat, edgeMat, edgeMat, edgeMat, this.front, backMat]);
+      this.mesh.castShadow = true;
+      this.mesh.position.set(0, CH / 2, CD / 2);
+      this.mesh.userData.piece = this;
+      this.pivot.add(this.mesh);
+      scene.add(this.pivot);
+      this.pos = new THREE.Vector3(0, 0, HAND_Z + 3);
+      this.tpos = this.pos.clone();
+      this.rotX = -1.2; this.trot = -1.2; this.rotZ = 0; this.trotZ = 0; this.scale = 1; this.tscale = 1;
+      this.fall = null; this.shakeT = 0; this.hover = false; this.flash = 0;
+    }
+    retexture() { this.front.map = faceTex(this.p); this.front.needsUpdate = true; }
+    update(dt, now) {
+      const k = 1 - Math.exp(-11 * dt);
+      this.pos.lerp(this.tpos, k);
+      if (this.fall) {
+        this.fall.t += dt;
+        const p = Math.min(1, this.fall.t / this.fall.dur);
+        this.rotX = -Math.PI / 2 * p * p;
+        if (p >= 1) { this.fall = null; this.rotX = -Math.PI / 2; this.trot = -Math.PI / 2; this.bounce = 1; }
+      } else {
+        this.rotX += (this.trot - this.rotX) * k;
+      }
+      let bounce = 0;
+      if (this.bounce > 0) { this.bounce = Math.max(0, this.bounce - dt * 3.5); bounce = Math.sin((1 - this.bounce) * 14) * 0.06 * this.bounce; }
+      this.rotZ += (this.trotZ - this.rotZ) * k;
+      this.scale += (this.tscale - this.scale) * k;
+      this.shakeT = Math.max(0, this.shakeT - dt);
+      const wob = this.shakeT > 0 ? Math.sin(now / 28) * 0.09 * this.shakeT : 0;
+      this.pivot.position.copy(this.pos);
+      this.pivot.rotation.set(this.rotX + bounce + wob * 0.5, 0, this.rotZ + wob);
+      this.pivot.scale.setScalar(this.scale);
+      this.flash = Math.max(0, this.flash - dt * 2.5);
+      if (this.redGlow) this.front.emissive.setRGB(0.35, 0.03, 0.02);
+      else this.front.emissive.setScalar(this.flash * 0.35);
+    }
+    dispose() { scene.remove(this.pivot); this.front.dispose(); }
   }
 
-  function resize() {
-    const w = stage.clientWidth;
-    const aspect = w < 600 ? 1.25 : 2.4;
-    const h = Math.round(w / aspect);
-    renderer.setSize(w, h, false);
-    canvas.style.height = h + 'px';
-    camera.aspect = aspect;
-    const half = THREE.MathUtils.degToRad(camera.fov / 2);
-    const needW = SLOTS * GAP + 0.35;
-    const d = Math.max(3.6, needW / (2 * Math.tan(half) * aspect));
-    camera.position.set(0, 0.5 + d * 0.3, d);
-    camera.lookAt(LOOK);
-    camera.updateProjectionMatrix();
+  /* particles */
+  const MAXP = 600;
+  const pPos = new Float32Array(MAXP * 3), pCol = new Float32Array(MAXP * 3), pVel = new Float32Array(MAXP * 3), pLife = new Float32Array(MAXP);
+  const pGeo = new THREE.BufferGeometry();
+  pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+  pGeo.setAttribute('color', new THREE.BufferAttribute(pCol, 3));
+  const dot = canvasTex(64, 64, (g) => { const r = g.createRadialGradient(32, 32, 0, 32, 32, 32); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, 64, 64); });
+  const points = new THREE.Points(pGeo, new THREE.PointsMaterial({ size: 0.13, map: dot, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+  points.frustumCulled = false;
+  scene.add(points);
+  let pCur = 0;
+  function burst(at, color, n = 26, speed = 3) {
+    const c = new THREE.Color(color);
+    for (let i = 0; i < n; i++) {
+      const j = pCur; pCur = (pCur + 1) % MAXP;
+      pPos.set([at.x, at.y, at.z], j * 3);
+      const a = Math.random() * Math.PI * 2, u = Math.random();
+      pVel.set([Math.cos(a) * speed * (0.3 + u), 1.5 + Math.random() * speed, Math.sin(a) * speed * (0.3 + u)], j * 3);
+      pCol.set([c.r, c.g, c.b], j * 3);
+      pLife[j] = 0.7 + Math.random() * 0.5;
+    }
   }
-  window.addEventListener('resize', resize);
+  function stepParticles(dt) {
+    for (let j = 0; j < MAXP; j++) {
+      if (pLife[j] <= 0) { pPos[j * 3 + 1] = -50; continue; }
+      pLife[j] -= dt;
+      pVel[j * 3 + 1] -= 7 * dt;
+      for (let a = 0; a < 3; a++) pPos[j * 3 + a] += pVel[j * 3 + a] * dt;
+      const f = Math.max(0, pLife[j]);
+      if (f < 0.3) for (let a = 0; a < 3; a++) pCol[j * 3 + a] *= 0.9;
+    }
+    pGeo.attributes.position.needsUpdate = true; pGeo.attributes.color.needsUpdate = true;
+  }
 
+  /* spark that hops along the chain */
+  const spark = new THREE.Mesh(new THREE.SphereGeometry(0.07, 16, 12), new THREE.MeshBasicMaterial({ color: 0xfff2b0 }));
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: dot, color: 0xffc23a, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+  glow.scale.setScalar(0.7); spark.add(glow); spark.visible = false; scene.add(spark);
+  let hop = null;
+  function hopTo(from, to, dur) {
+    return new Promise((res) => { hop = { from: from.clone(), to: to.clone(), t: 0, dur, res }; spark.visible = true; });
+  }
+
+  /* ───────────── HTML anchored to 3D ───────────── */
+  const labels = $('labels');
+  const anchors = new Set();
+  function anchor(cls, html, getPos) {
+    const el = document.createElement('div');
+    el.className = 'anchor ' + cls; el.innerHTML = html; labels.appendChild(el);
+    const a = { el, getPos }; anchors.add(a); return a;
+  }
+  function unanchor(a) { if (!a) return; a.el.remove(); anchors.delete(a); }
+  const tmp = new THREE.Vector3();
   function toScreen(v) {
-    const p = v.clone().project(camera);
-    return { x: (p.x * 0.5 + 0.5) * canvas.clientWidth, y: (-p.y * 0.5 + 0.5) * canvas.clientHeight };
+    tmp.copy(v).project(camera);
+    return { x: (tmp.x * 0.5 + 0.5) * innerWidth, y: (-tmp.y * 0.5 + 0.5) * innerHeight, behind: tmp.z > 1 };
   }
-  function pop(i, text, cls, yOff = 0) {
-    const pv = pieces[i];
-    if (!pv) return;
-    const at = toScreen(new THREE.Vector3(pv.position.x - CW / 2, 0.75 + yOff, 0));
+  function pop(world, text, cls) {
+    const s = toScreen(world);
     const el = document.createElement('div');
     el.className = 'pop ' + cls; el.textContent = text;
-    el.style.left = at.x + 'px'; el.style.top = at.y + 'px';
-    $('pops').appendChild(el);
-    setTimeout(() => el.remove(), 1500);
+    el.style.left = s.x + 'px'; el.style.top = s.y + 'px';
+    labels.appendChild(el);
+    setTimeout(() => el.remove(), 1300);
   }
+  const handLbl = anchor('tablelbl', '', () => new THREE.Vector3(0, 0.02, handZ() + (portrait ? 1.75 : 0.5)));
+  const spLbl = anchor('tablelbl', '', () => new THREE.Vector3(0, 0.02, spZ() + 0.42));
 
-  let last = performance.now();
-  function frame(now) {
-    const dt = Math.min(0.05, (now - last) / 1000); last = now;
-    for (const pv of pieces) {
-      const u = pv.userData;
-      const k = 1 - Math.exp(-(u.fast ? 16 : 10) * dt);
-      u.rot += (u.target - u.rot) * k;
-      u.y += (u.ty - u.y) * (1 - Math.exp(-12 * dt));
-      u.shake = Math.max(0, u.shake - dt * 1.5);
-      pv.rotation.z = u.rot + Math.sin(now / 35) * 0.06 * u.shake;
-      pv.position.y = u.y;
-    }
-    renderer.render(scene, camera);
-    requestAnimationFrame(frame);
-  }
-
-  /* ───────── game state ───────── */
+  /* ───────────── state ───────────── */
   const TARGET = 4000, TIPS = 3;
-  const S = { deck: [], hand: [], chain: [], used: {}, score: 0, tips: TIPS, busy: false, demo: false };
+  const S = { deck: [], hand: [], chain: [], score: 0, tips: TIPS, busy: false, mode: 'title', tutorial: false };
+  const pieces = new Map(); // id -> Piece
+  const SPECIAL_IDS = ['bridge', 'loop', 'ramp'];
+  let hovered = null;
+  let badgeAnchors = [];
+
+  function getPiece(p) {
+    if (!pieces.has(p.id)) pieces.set(p.id, new Piece(p));
+    return pieces.get(p.id);
+  }
   function newDeck() {
     const d = [];
     for (const s of 'shcd') for (let r = 2; r <= 14; r++) d.push({ r, s, id: r + s });
     for (let i = d.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [d[i], d[j]] = [d[j], d[i]]; }
     return d;
   }
-  function sortHand() { S.hand.sort((a, b) => a.r - b.r || a.s.localeCompare(b.s)); }
-  function draw() { while (S.hand.length < 8 && S.deck.length) S.hand.push(S.deck.pop()); sortHand(); }
-  function setHud(chips, mult) {
+  const sortHand = () => S.hand.sort((a, b) => a.r - b.r || a.s.localeCompare(b.s));
+  function draw() {
+    while (S.hand.length < 8 && S.deck.length) {
+      const c = S.deck.pop(); S.hand.push(c);
+      const pc = getPiece(c); pc.pos.set(7, 0.4, HAND_Z - 0.6); pc.rotX = -1.4;
+    }
+    sortHand();
+  }
+  const inChain = (p) => S.chain.includes(p);
+
+  /* layout: where every piece wants to be right now */
+  function layout() {
+    const handLeft = S.hand.filter((c) => !inChain(c));
+    const n = handLeft.length;
+    const perRow = portrait ? 4 : 8;
+    handLeft.forEach((c, i) => {
+      const row = Math.floor(i / perRow), inRow = Math.min(perRow, n - row * perRow);
+      const sp = Math.min(0.86, (portrait ? 3.5 : 6.8) / Math.max(inRow, 1));
+      const pc = getPiece(c), off = (i % perRow) - (inRow - 1) / 2;
+      const up = pc === hovered && canEdit() ? 1 : 0;
+      pc.tpos.set(off * sp, 0.02 + up * 0.18, handZ() + row * 1.2 + Math.abs(off) * 0.03 - up * 0.12);
+      pc.trot = -1.08 + up * 0.25; pc.trotZ = -off * 0.025; pc.tscale = 1;
+    });
+    SPECIAL_IDS.forEach((id, j) => {
+      const p = { sp: id, id };
+      const pc = getPiece(specialData[id]);
+      if (inChain(specialData[id])) return;
+      const up = pc === hovered && canEdit() ? 1 : 0;
+      pc.tpos.set((j - 1) * 1.05, 0.02 + up * 0.15, spZ());
+      pc.trot = -1.25 + up * 0.25; pc.trotZ = 0; pc.tscale = 0.88;
+    });
+    S.chain.forEach((p, i) => {
+      const pc = getPiece(p);
+      const sp = slotPos(i);
+      pc.tpos.set(sp.x, 0, sp.z);
+      if (!pc.fallen && !pc.fall) { pc.trot = pc === hovered && canEdit() ? -0.12 : 0; }
+      pc.trotZ = 0; pc.tscale = 1;
+    });
+  }
+  const specialData = { bridge: { sp: 'bridge', id: 'bridge' }, loop: { sp: 'loop', id: 'loop' }, ramp: { sp: 'ramp', id: 'ramp' } };
+  const canEdit = () => S.mode === 'play' && !S.busy && !S.tutorial;
+
+  /* link badges between standing pieces */
+  function refreshBadges() {
+    badgeAnchors.forEach(unanchor); badgeAnchors = [];
+    if (S.busy && !S.tutorial) return;
+    if (S.busy && S.tutorial && S.tipping) return;
+    const pl = previewLinks(S.chain);
+    pl.forEach((lk, i) => {
+      if (i === 0) return;
+      let html;
+      const t = L();
+      if (lk.kind === 'ok') html = lk.l.map((k) => `<span class="ok">${t[k]}</span>`).join('');
+      else if (lk.kind === 'wild') html = `<span class="wild">${t.wild}</span>`;
+      else if (lk.kind === 'stop') html = `<span class="stop">${t.stop}</span>`;
+      else html = `<span class="thru">${t.thru}</span>`;
+      badgeAnchors.push(anchor('badge', html, () => {
+        const a = slotPos(i - 1), b = slotPos(i);
+        const x = a.z === b.z ? (a.x + b.x) / 2 : b.x - GAP / 2 - 0.05;
+        return new THREE.Vector3(x, CH + 0.28, b.z);
+      }));
+    });
+  }
+
+  /* ───────────── HUD ───────────── */
+  function setHud(chips = 0, mult = 1) {
     $('hTarget').textContent = fmt(TARGET);
     $('hScore').textContent = fmt(S.score);
     $('hTips').textContent = S.tips;
-    $('hChips').textContent = fmt(chips ?? 0);
-    $('hMult').textContent = mult == null ? '1' : (mult % 1 ? mult.toFixed(1) : fmt(mult));
+    $('hDeck').textContent = S.deck.length;
+    $('hChips').textContent = fmt(chips);
+    $('hMult').textContent = fmtM(mult);
   }
-  function caption(html) { $('caption').innerHTML = html; }
-
-  function render() {
-    const inChain = new Set(S.chain.filter((p) => !p.sp).map((p) => p.id));
-    // hand
-    $('hand').innerHTML = '';
-    S.hand.forEach((c) => {
-      const b = document.createElement('button');
-      b.className = 'pc' + (inChain.has(c.id) ? ' used' : '');
-      b.disabled = S.busy || S.demo || inChain.has(c.id) || S.chain.length >= SLOTS;
-      b.style.color = SUIT_COLOR[c.s];
-      b.innerHTML = `<span>${rl(c.r)}</span><span class="s">${SUITS[c.s]}︎</span>`;
-      b.setAttribute('aria-label', 'Stand ' + rl(c.r) + ' of ' + { s: 'spades', h: 'hearts', c: 'clubs', d: 'diamonds' }[c.s]);
-      b.onclick = () => place(c);
-      $('hand').appendChild(b);
-    });
-    // specials
-    $('specials').innerHTML = '';
-    Object.keys(SPECIALS).forEach((k) => {
-      const s = SPECIALS[k];
-      const used = S.chain.some((p) => p.sp === k);
-      const b = document.createElement('button');
-      b.className = 'spc' + (used ? ' used' : '');
-      b.disabled = S.busy || S.demo || used || S.chain.length >= SLOTS;
-      b.innerHTML = `<b>${s.icon} ${s.name}</b><span>${s.text}</span>`;
-      b.onclick = () => place({ sp: k, id: k });
-      $('specials').appendChild(b);
-    });
-    // chain preview
-    const box = $('chain');
-    box.innerHTML = '';
-    if (!S.chain.length) box.innerHTML = '<span class="empty">Empty. Pick cards from your hand to stand them here, left to right.</span>';
-    const pl = previewLinks(S.chain);
-    let stopped = false;
-    S.chain.forEach((p, i) => {
-      const L = pl[i];
-      if (i > 0) {
-        const t = document.createElement('span');
-        if (L.kind === 'ok') { t.className = 'link ok'; t.textContent = L.l.join(' + '); }
-        else if (L.kind === 'wild') { t.className = 'link wild'; t.textContent = 'wild'; }
-        else if (L.kind === 'stop') { t.className = 'link stop'; t.textContent = '✕ stops'; }
-        else { t.className = 'link thru'; t.textContent = '→'; }
-        box.appendChild(t);
-      }
-      if (L.kind === 'stop') stopped = true;
-      const b = document.createElement('button');
-      b.className = 'mini' + (p.sp ? ' sp' : '') + (L.kind === 'stop' ? ' broken' : '');
-      if (!p.sp) b.style.color = SUIT_COLOR[p.s];
-      b.textContent = p.sp ? SPECIALS[p.sp].name : label(p);
-      b.title = 'Take it out';
-      b.disabled = S.busy || S.demo;
-      b.onclick = () => removeAt(i);
-      box.appendChild(b);
-    });
-    const real = S.chain.filter((p) => !p.sp).length;
-    $('btnTip').disabled = S.busy || S.demo || real === 0 || S.tips <= 0;
-    $('btnClear').disabled = S.busy || S.demo || !S.chain.length;
-    $('note').textContent = stopped ? 'Heads up: the chain stops at the red ✕. Cards after it will not score.' : real ? `${S.chain.length}/${SLOTS} pieces standing.` : '';
-    setHud();
+  function bump(el) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+  function caption(html) { const c = $('caption'); if (html == null) { c.hidden = true; return; } c.innerHTML = html; c.hidden = false; }
+  function refreshButtons() {
+    const real = S.chain.some((p) => !p.sp);
+    $('actions').hidden = S.mode !== 'play';
+    $('tipBtn').disabled = !canEdit() || !real || S.tips <= 0;
+    $('clearBtn').disabled = !canEdit() || !S.chain.length;
+    if (S.mode === 'play' && !S.busy && !S.tutorial) {
+      const stop = previewLinks(S.chain).some((x) => x.kind === 'stop');
+      caption(stop ? L().hintStop : L().hint);
+    }
+  }
+  function applyLang() {
+    document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+    document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = L()[el.dataset.t]; });
+    $('rulesBody').innerHTML = L().rules;
+    $('langBtn').textContent = lang === 'zh' ? 'EN' : '中';
+    $('lEn').setAttribute('aria-pressed', String(lang === 'en'));
+    $('lZh').setAttribute('aria-pressed', String(lang === 'zh'));
+    handLbl.el.textContent = L().handLbl; spLbl.el.textContent = L().spLbl;
+    SPECIAL_IDS.forEach((id) => pieces.get(id) && pieces.get(id).retexture());
+    refreshBadges(); refreshButtons();
+  }
+  async function setLang(l) {
+    lang = l;
+    try { localStorage.setItem('cascade-lang', l); } catch (e) { /* optional */ }
+    if (l === 'zh' && document.fonts) { try { await Promise.race([document.fonts.load('900 52px "Noto Sans SC"', '桥接回放翻倍'), wait(1500)]); } catch (e) { /* fallback font */ } }
+    applyLang();
   }
 
+  /* ───────────── actions ───────────── */
   function place(p) {
-    if (S.chain.length >= SLOTS) return;
+    if (S.chain.length >= SLOTS || inChain(p)) return;
     S.chain.push(p);
-    addPiece(p, S.chain.length - 1);
-    pieces[pieces.length - 1].userData.ty = 0;
-    render();
+    const pc = getPiece(p); pc.fallen = false; pc.trot = 0;
+    tone(520 + S.chain.length * 45, 0.07, 'square', 0.06);
+    refreshBadges(); refreshButtons();
   }
-  function removeAt(i) {
+  function unplace(p) {
+    const i = S.chain.indexOf(p);
+    if (i < 0) return;
     S.chain.splice(i, 1);
-    syncPieces(S.chain);
-    blip(300, 0.06, 'square', 0.05);
-    render();
+    tone(300, 0.07, 'square', 0.05);
+    refreshBadges(); refreshButtons();
   }
-  function clearChain() { S.chain = []; syncPieces(S.chain); render(); }
+  function clearChain() { [...S.chain].forEach(unplace); }
 
-  async function tip(captions) {
-    if (S.busy) return;
-    S.busy = true; render();
+  async function tip(tut) {
+    S.busy = true; S.tipping = true; refreshBadges(); refreshButtons();
     const res = simulate(S.chain);
     setHud(0, 1);
-    caption('<b>Tipping…</b> watch each card knock over the next.');
+    if (!tut) caption(L().tipping);
+    const t = L();
     let n = 0;
+    const top = (i) => { const sp = slotPos(i); return new THREE.Vector3(sp.x, CH + 0.05, sp.z); };
+    spark.position.copy(top(0)).add(new THREE.Vector3(-0.9, 0.3, 0));
     for (const e of res.ev) {
-      const pv = pieces[e.i];
+      const pc = getPiece(S.chain[e.i]);
+      await hopTo(spark.position, top(e.i), (n === 0 ? 260 : 170) / 1000);
       if (e.kind === 'break') {
-        // previous piece leans on this one; this one wobbles and stays up
-        const prevIdx = e.i - 1;
-        if (pieces[prevIdx]) pieces[prevIdx].userData.target = -0.22;
-        pv.userData.shake = 1.2;
-        pv.userData.front.emissive.setHex(0x551010);
-        pop(e.i, '✕ no link', 'bad');
-        blip(140, 0.3, 'sawtooth', 0.12);
-        caption(captions?.break || `<b>Chain stopped.</b> ${label(e.prev)} and ${label(S.chain[e.i])} share nothing, so the rest of the line never falls.`);
-        await wait(1200 * SPEED);
+        pc.shakeT = 1.2; pc.redGlow = true;
+        pop(top(e.i).add(new THREE.Vector3(0, 0.25, 0)), t.popNo, 'bad');
+        tone(140, 0.35, 'sawtooth', 0.14, 0.5);
+        shake = Math.max(shake, 0.12);
+        caption(t.broke(cardName(e.prev), cardName(S.chain[e.i])));
+        await wait(1400);
         break;
       }
-      pv.userData.target = -1.42;
+      pc.fall = { t: 0, dur: 0.34 }; pc.fallen = true; pc.flash = 1;
       n++;
+      thud(n);
+      shake = Math.max(shake, 0.05 + n * 0.012);
+      const sp = slotPos(e.i);
+      const lie = new THREE.Vector3(sp.x, 0.35, sp.z - 0.55);
       if (e.kind === 'card') {
-        blip(330 * Math.pow(1.06, n), 0.1);
-        pop(e.i, '+' + e.c, 'c');
-        if (e.m) setTimeout(() => pop(e.i, '+' + e.m + ' mult', 'm', 0.32), 160 * SPEED);
-        if (captions?.card) caption(captions.card(e, S.chain[e.i]));
+        setTimeout(() => {
+          pop(lie, '+' + e.c, 'c');
+          burst(lie, '#3b8bff', 18, 2.2);
+          if (e.m) setTimeout(() => { pop(lie.clone().add(new THREE.Vector3(0, 0.45, 0)), t.popMult(e.m), 'm'); burst(lie, '#ff4a3d', 14, 2); }, 140);
+        }, 300);
+        if (tut) caption(t.tutCard(cardName(S.chain[e.i]), e.base, e.tags.map((k) => t[k].split(' ')[0]).join(' + ')));
       } else if (e.kind === 'ramp') {
-        blip(180, 0.35, 'sawtooth', 0.15);
-        pop(e.i, '×2 MULT', 'x');
-        if (captions?.ramp) caption(captions.ramp(e));
+        setTimeout(() => { pop(lie, t.popX, 'x'); burst(lie, '#ff4a3d', 60, 4); shake = 0.3; tone(160, 0.4, 'sawtooth', 0.18, 3); }, 300);
+        if (tut) caption(t.tutRamp(fmtM(e.mult)));
       } else if (e.kind === 'loop') {
-        blip(660, 0.15, 'triangle', 0.15);
-        pop(e.i, `↺ +${e.dc} chips +${e.dm} mult`, 's');
-        if (captions?.loop) caption(captions.loop(e));
+        setTimeout(() => { pop(lie, t.popLoop(e.dc, e.dm), 's'); burst(lie, '#b98cff', 30, 3); tone(660, 0.18); }, 300);
+        if (tut) caption(t.tutLoop(e.dc, e.dm));
       } else {
-        blip(800, 0.1, 'triangle', 0.12);
-        pop(e.i, '⇄ wild', 's');
-        if (captions?.bridge) caption(captions.bridge(e));
+        setTimeout(() => { pop(lie, t.popWild, 's'); burst(lie, '#b98cff', 20, 2.5); }, 300);
       }
-      setHud(e.chips, e.mult);
-      await wait((captions ? 1300 : 520) * SPEED);
+      await wait(320);
+      setHud(e.chips, e.mult); bump($('hChips')); bump($('hMult'));
+      await wait(tut ? 1300 : 330);
     }
-    // the last standing piece of a complete chain falls flat
-    await wait(350 * SPEED);
+    spark.visible = false;
+    await wait(300);
+    // the payoff
     const total = res.score;
-    S.score += total;
-    S.tips -= 1;
-    blip(392, 0.25); blip(523, 0.25); blip(659, 0.3);
-    caption(`<b>${fmt(res.chips)} chips × ${res.mult % 1 ? res.mult.toFixed(1) : fmt(res.mult)} mult = ${fmt(total)}</b>${res.broke >= 0 ? `. The chain broke after ${res.broke} piece${res.broke === 1 ? '' : 's'}.` : '. Full chain!'}`);
-    setHud(res.chips, res.mult);
-    await wait(1600 * SPEED);
+    const big = document.createElement('div');
+    big.className = 'total'; big.textContent = fmt(total);
+    document.body.appendChild(big);
+    setTimeout(() => big.remove(), 1600);
+    tone(392, 0.25); tone(523, 0.25); tone(659, 0.35);
+    shake = Math.max(shake, Math.min(0.5, 0.1 + total / 8000));
+    burst(new THREE.Vector3(0, 1.2, LANE_Z), '#ffc23a', 90, 5);
+    caption(t.summary(fmt(res.chips), fmtM(res.mult), fmt(total), res.broke < 0));
+    await wait(1100);
+    S.score += total; S.tips -= 1;
+    setHud(res.chips, res.mult); bump($('hScore'));
+    await wait(900);
+    S.tipping = false;
     return res;
   }
 
-  function afterTip() {
-    const usedIds = new Set(S.chain.filter((p) => !p.sp).map((p) => p.id));
-    S.hand = S.hand.filter((c) => !usedIds.has(c.id));
+  function sweep() {
+    // used cards fly off the table, specials return home
+    for (const p of S.chain) {
+      const pc = getPiece(p);
+      pc.fallen = false; pc.redGlow = false;
+      if (p.sp) { pc.trot = -1.25; continue; }
+      pc.tpos.set(9, 0.3, LANE_Z - 1.5); pc.trot = -Math.PI / 2;
+      const id = p.id;
+      setTimeout(() => { const q = pieces.get(id); if (q && !S.hand.includes(q.p)) { q.dispose(); pieces.delete(id); } }, 900);
+    }
+    const used = new Set(S.chain.filter((p) => !p.sp));
+    S.hand = S.hand.filter((c) => !used.has(c));
     S.chain = [];
-    syncPieces(S.chain);
+  }
+
+  async function onTip() {
+    if (!canEdit()) return;
+    await tip(false);
+    sweep();
+    await wait(350);
     draw();
     S.busy = false;
-    if (S.score >= TARGET) return endGame(true);
-    if (S.tips <= 0) return endGame(false);
-    caption(`Score <b>${fmt(S.score)}</b> of ${fmt(TARGET)}. ${S.tips} tip${S.tips === 1 ? '' : 's'} left. New cards drawn: build the next chain.`);
-    render();
+    setHud();
+    if (S.score >= TARGET) return endRound(true);
+    if (S.tips <= 0) return endRound(false);
+    refreshBadges(); refreshButtons();
+    caption(L().next(fmt(S.score), fmt(TARGET), S.tips));
+    await wait(2600);
+    if (S.mode === 'play' && !S.busy && !S.chain.length) refreshButtons();
   }
 
-  function endGame(win) {
-    S.busy = true; render();
-    $('bTitle').textContent = win ? 'Blind cleared!' : `Short by ${fmt(TARGET - S.score)}`;
-    $('bTitle').style.color = win ? 'var(--gold)' : 'var(--mult)';
-    $('bText').textContent = win
-      ? `You scored ${fmt(S.score)} against a target of ${fmt(TARGET)}. In the full game, the shop would open now.`
-      : `You scored ${fmt(S.score)} of ${fmt(TARGET)}. One more link would have done it. That gap is the near-miss that makes you deal again.`;
-    $('banner').hidden = false;
+  function endRound(win) {
+    S.mode = 'result'; refreshButtons(); caption(null);
+    const t = L();
+    $('rTitle').textContent = win ? t.win : t.lose(fmt(TARGET - S.score));
+    $('rTitle').style.color = win ? 'var(--gold)' : 'var(--mult)';
+    $('rText').textContent = win ? t.winText(fmt(S.score), fmt(TARGET)) : t.loseText(fmt(S.score), fmt(TARGET));
+    if (win) { for (let i = 0; i < 5; i++) setTimeout(() => burst(new THREE.Vector3((Math.random() - 0.5) * 6, 1, LANE_Z), ['#ffc23a', '#3b8bff', '#ff4a3d', '#3ddc97', '#b98cff'][i], 70, 6), i * 180); tone(523, 0.3); tone(659, 0.3); tone(784, 0.4); }
+    else tone(220, 0.5, 'sawtooth', 0.12, 0.5);
+    setTimeout(() => { $('result').hidden = false; }, win ? 700 : 300);
   }
 
-  function newGame() {
-    $('banner').hidden = true;
-    S.deck = newDeck(); S.hand = []; S.chain = []; S.score = 0; S.tips = TIPS; S.busy = false; S.demo = false;
-    syncPieces([]);
-    draw();
-    caption('Click cards in your hand to stand them in a line. Check the links between them, then press <b>Tip it!</b>');
-    render();
+  function resetTable() {
+    for (const [id, pc] of pieces) { if (!SPECIAL_IDS.includes(id)) { pc.dispose(); pieces.delete(id); } }
+    SPECIAL_IDS.forEach((id) => { const pc = getPiece(specialData[id]); pc.fallen = false; pc.redGlow = false; });
+    S.deck = newDeck(); S.hand = []; S.chain = []; S.score = 0; S.tips = TIPS; S.busy = false; S.tutorial = false; S.tipping = false;
   }
 
-  /* ───────── guided example ───────── */
-  const C = (r, s) => ({ r, s, id: r + s });
-  async function watchExample() {
-    if (S.busy && !S.demo) return;
-    $('banner').hidden = true;
-    S.demo = true; S.busy = false;
-    S.deck = newDeck();
+  function startGame() {
+    $('title').hidden = true; $('result').hidden = true; $('skip').hidden = true;
+    resetTable();
+    S.mode = 'play';
+    draw(); setHud(); refreshBadges(); refreshButtons();
+  }
+
+  /* guided example */
+  let tutToken = 0;
+  async function startTutorial() {
+    const my = ++tutToken;
+    $('title').hidden = true; $('result').hidden = true;
+    resetTable();
+    S.mode = 'play'; S.tutorial = true; S.busy = true;
+    const C = (r, s) => ({ r, s, id: r + s });
     S.hand = [C(2, 'd'), C(5, 'h'), C(6, 'h'), C(6, 'c'), C(7, 'c'), C(8, 'c'), C(9, 'd'), C(13, 's')];
-    S.deck = S.deck.filter((c) => !S.hand.some((h) => h.id === c.id));
-    S.chain = []; S.score = 0; S.tips = TIPS;
-    syncPieces([]);
-    render();
-    const step = async (html, fn, ms = 2600) => { caption(html); if (fn) fn(); render(); await wait(ms * (REDUCE ? 0.6 : 1)); };
-    await step('You draw <b>8 cards</b>. This tip, you will stand some of them in a line on the table.', null, 2600);
-    await step('<b>5♥</b> goes first. It starts the chain.', () => place(C(5, 'h')));
-    await step('<b>6♥</b> links to 5♥ two ways: one rank apart (<b>step</b>) and the same suit (<b>suit</b>). Look at the green badge.', () => place(C(6, 'h')), 3200);
-    await step('<b>6♣</b> links to 6♥ by rank: a <b>pair</b>.', () => place(C(6, 'c')));
-    await step('Now <b>K♠</b>. It shares nothing with 6♣. The red <b>✕ stops</b> badge warns you the chain would stop here.', () => place(C(13, 's')), 3600);
-    await step('So take it back out. Choosing the order is the whole puzzle.', () => removeAt(3), 2400);
-    await step('<b>7♣</b> follows 6♣: a step and the same suit. Three steps in a row also earn a <b>run</b> bonus.', () => place(C(7, 'c')), 3200);
-    await step('A <b>Loop</b> piece replays the last two cards\' scores when it falls.', () => place({ sp: 'loop', id: 'loop' }), 3000);
-    await step('<b>8♣</b> still has to link to 7♣ across the Loop: step, suit and run.', () => place(C(8, 'c')), 3000);
-    await step('<b>Ramp</b> doubles the mult at the moment it falls, so put it last: add first, multiply last. Same skill as Balatro.', () => place({ sp: 'ramp', id: 'ramp' }), 3600);
-    await step('Ready. <b>Tip it!</b>', null, 1400);
-    S.demo = false;
-    const res = await tip({
-      card: (e, p) => `<b>${label(p)}</b> falls: <span class="c-t">+${e.base} chips</span> for its value${e.tags.length ? ', links: <b>' + e.tags.join(', ') + '</b>' : ' (first card, nothing to link to)'}.`,
-      loop: (e) => `<b>Loop</b> replays the last two cards: <span class="c-t">+${e.dc} chips</span>, <span class="m-t">+${e.dm} mult</span>.`,
-      ramp: (e) => `<b>Ramp</b>: mult doubles to <span class="m-t">${fmt(e.mult)}</span>. Because it fell last, it doubled everything before it.`,
-    });
-    S.demo = true;
-    await wait(800);
-    caption(`One tip scored <b>${fmt(res.score)}</b>. A real game gives you <b>3 tips</b> to reach the target, with random cards. Press <b>Deal a new game</b> to try.`);
-    S.score = 0; S.tips = TIPS; S.chain = []; syncPieces([]);
-    S.demo = false; S.busy = false;
-    S.deck = newDeck(); S.hand = []; draw();
-    render();
+    const ids = new Set(S.hand.map((c) => c.id));
+    S.deck = S.deck.filter((c) => !ids.has(c.id));
+    S.hand.forEach((c, i) => { const pc = getPiece(c); pc.pos.set(7, 0.4, HAND_Z - 0.6); });
+    setHud(); refreshButtons();
+    $('skip').hidden = false;
+    const card = (r, s) => S.hand.find((c) => c.r === r && c.s === s);
+    const T = () => L().tut;
+    const steps = [
+      [0, null, 2600], [1, () => place(card(5, 'h'))], [2, () => place(card(6, 'h')), 3300], [3, () => place(card(6, 'c'))],
+      [4, () => place(card(13, 's')), 3600], [5, () => unplace(card(13, 's')), 2500], [6, () => place(card(7, 'c')), 3300],
+      [7, () => place(specialData.loop), 3000], [8, () => place(card(8, 'c')), 3000], [9, () => place(specialData.ramp), 3600], [10, null, 1500],
+    ];
+    for (const [k, fn, ms] of steps) {
+      if (my !== tutToken) return;
+      caption(T()[k]);
+      if (fn) fn();
+      await wait((ms || 2600) * (REDUCE ? 0.6 : 1));
+    }
+    if (my !== tutToken) return;
+    const res = await tip(true);
+    if (my !== tutToken) return;
+    caption(L().tutEnd(fmt(res.score)));
+    await wait(3600);
+    if (my !== tutToken) return;
+    startGame();
   }
 
-  $('btnTip').onclick = async () => { await tip(); afterTip(); };
-  $('btnClear').onclick = clearChain;
-  $('btnPlay').onclick = newGame;
-  $('bBtn').onclick = newGame;
-  $('btnWatch').onclick = watchExample;
+  /* ───────────── input ───────────── */
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  function pick(ev) {
+    ndc.set((ev.clientX / innerWidth) * 2 - 1, -(ev.clientY / innerHeight) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    const meshes = [...pieces.values()].map((p) => p.mesh);
+    const hit = ray.intersectObjects(meshes, false)[0];
+    return hit ? hit.object.userData.piece : null;
+  }
+  canvas.addEventListener('pointermove', (ev) => {
+    const pc = canEdit() ? pick(ev) : null;
+    if (pc !== hovered) { hovered = pc; if (pc) tone(900, 0.03, 'triangle', 0.04); }
+    canvas.style.cursor = pc ? 'pointer' : 'default';
+  });
+  canvas.addEventListener('pointerdown', (ev) => {
+    if (!canEdit()) return;
+    const pc = pick(ev);
+    if (!pc) return;
+    if (inChain(pc.p)) unplace(pc.p);
+    else if (S.chain.length < SLOTS) place(pc.p);
+  });
+  $('tipBtn').onclick = onTip;
+  $('clearBtn').onclick = () => canEdit() && clearChain();
+  $('playBtn').onclick = startGame;
+  $('howBtn').onclick = startTutorial;
+  $('againBtn').onclick = startGame;
+  $('menuBtn').onclick = () => { $('result').hidden = true; S.mode = 'title'; resetTable(); demoChain(); $('title').hidden = false; refreshButtons(); caption(null); };
+  $('skip').onclick = () => { tutToken++; startGame(); };
+  $('rulesBtn').onclick = () => { $('rulesScr').hidden = false; };
+  $('rulesClose').onclick = () => { $('rulesScr').hidden = true; };
+  $('langBtn').onclick = () => setLang(lang === 'zh' ? 'en' : 'zh');
+  $('lEn').onclick = () => setLang('en');
+  $('lZh').onclick = () => setLang('zh');
+  $('soundBtn').onclick = () => { muted = !muted; $('soundBtn').textContent = muted ? '✕' : '♪'; };
+  window.addEventListener('keydown', (e) => { if (e.key === 'Enter' && canEdit()) onTip(); if (e.key === 'Escape') $('rulesScr').hidden = true; });
+
+  /* ───────────── camera fit & loop ───────────── */
+  function resize() {
+    const w = innerWidth, h = innerHeight;
+    renderer.setSize(w, h, false);
+    const narrow = w <= 760 || h <= 520;
+    const sideW = narrow ? 0 : 250;
+    const topH = narrow ? $('side').offsetHeight + 8 : 0;
+    const botH = narrow ? 70 : 0;
+    const cw = w - sideW, ch = h - topH - botH;
+    camera.aspect = w / h;
+    camera.setViewOffset(w, h, -sideW / 2, -(topH - botH) / 2, w, h);
+    const vh = THREE.MathUtils.degToRad(camera.fov);
+    // content box on screen: ~9.2 units wide, ~7.4 units tall (perspective-compressed table depth)
+    const wasPortrait = portrait;
+    portrait = cw / ch < 0.95;
+    if (portrait !== wasPortrait || !laneMarks.length) { buildLanes(); refreshBadges(); }
+    // content box on screen (perspective-compressed): landscape ~9.2 x 7.4 units, portrait ~4.7 x 9.6
+    const boxW = portrait ? 4.7 : 9.2, boxH = portrait ? 10.2 : 7.4;
+    handLbl.el.hidden = portrait;
+    const needH = Math.max(boxH, boxW / (cw / ch));
+    camDist = (needH * h / ch) / (2 * Math.tan(vh / 2)) * 0.95;
+    LOOK.z = portrait ? 0.35 : -0.1;
+    scene.fog.near = camDist + 2; scene.fog.far = camDist + 14;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', resize);
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    layout();
+    for (const pc of pieces.values()) pc.update(dt, now);
+    if (hop) {
+      hop.t += dt;
+      const p = Math.min(1, hop.t / hop.dur);
+      spark.position.lerpVectors(hop.from, hop.to, p);
+      spark.position.y += Math.sin(p * Math.PI) * 0.35;
+      if (p >= 1) { const r = hop.res; hop = null; r(); }
+    }
+    stepParticles(dt);
+    shake = Math.max(0, shake - dt * 0.8);
+    const sh = REDUCE ? 0 : shake * shake;
+    camera.position.copy(LOOK).addScaledVector(CAM_DIR, camDist);
+    camera.position.x += (Math.random() - 0.5) * sh; camera.position.y += (Math.random() - 0.5) * sh;
+    camera.lookAt(LOOK);
+    for (const a of anchors) {
+      const s = toScreen(a.getPos());
+      a.el.style.transform = `translate(${s.x}px, ${s.y}px) translate(-50%, -50%)`;
+    }
+    renderer.render(scene, camera);
+    requestAnimationFrame(frame);
+  }
+
+  /* title screen: a sample chain stands on the table behind the menu */
+  function demoChain() {
+    const C = (r, s) => ({ r, s, id: r + s });
+    S.hand = [C(4, 'd'), C(5, 'd'), C(5, 's'), C(6, 's'), C(7, 's')];
+    S.hand.forEach((c) => getPiece(c));
+    S.hand.forEach((c) => S.chain.push(c));
+    S.chain.splice(3, 0, specialData.loop);
+    S.chain.push(specialData.ramp);
+    S.mode = 'title';
+    refreshBadges();
+  }
 
   function start() {
     resize();
+    applyLang();
+    demoChain();
+    setHud();
     requestAnimationFrame(frame);
-    newGame();
-    // show an example chain at rest so the first frame explains itself
-    const starters = [C(4, 'd'), C(5, 'd'), C(5, 's')];
-    const ids = new Set(starters.map((c) => c.id));
-    S.deck = newDeck().filter((c) => !ids.has(c.id));
-    S.hand = [];
-    while (S.hand.length < 5) S.hand.push(S.deck.pop());
-    S.hand.push(...starters);
-    sortHand();
-    starters.forEach((c) => place(S.hand.find((h) => h.id === c.id)));
-    caption('Three cards are already standing: <b>4♦ → 5♦</b> (step + suit) <b>→ 5♠</b> (pair). Add more, or press <b>Tip it!</b> Want it explained? Press <b>Watch an example</b>.');
   }
-  const fontsReady = document.fonts && document.fonts.ready ? Promise.race([document.fonts.ready, wait(1500)]) : Promise.resolve();
-  fontsReady.then(start);
+  const ready = document.fonts && document.fonts.ready ? Promise.race([document.fonts.ready, wait(1500)]) : Promise.resolve();
+  ready.then(start);
 })();
 </script>
 
