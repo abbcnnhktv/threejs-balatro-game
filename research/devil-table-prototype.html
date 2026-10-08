@@ -1,0 +1,888 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>恶魔赌桌</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Noto+Sans+SC:wght@500;900&display=swap">
+<style>
+/* Layout: full-screen PS1-style 3D table; thin pixel HUD around the edges (devil top, chambers bottom-left, actions bottom-right). Single committed dark look. */
+:root {
+  --ink: #e9dcc0;
+  --dim: #8f8270;
+  --blood: #c0261d;
+  --gold: #e8b33a;
+  --blank: #5a8fd6;
+  --panel: rgba(10, 7, 6, 0.82);
+  --line: #3b2a22;
+  --bg: #050403;
+  --font-pixel: "DotGothic16", "Noto Sans SC", "Microsoft YaHei", monospace;
+  --font-heavy: "Noto Sans SC", "DotGothic16", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; overflow: hidden; background: var(--bg); color: var(--ink); font-family: var(--font-pixel); user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+#gl { position: fixed; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+button { font-family: var(--font-pixel); color: var(--ink); cursor: pointer; border: 2px solid var(--line); background: #1a110d; }
+button:disabled { opacity: 0.35; cursor: default; }
+button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.panel { background: var(--panel); border: 2px solid var(--line); padding: 8px 10px; }
+.lbl { font-size: 12px; color: var(--dim); letter-spacing: 0.08em; }
+.num { font-variant-numeric: tabular-nums; }
+
+#top { position: fixed; top: calc(10px + env(safe-area-inset-top, 0px)); left: 10px; right: 10px; display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; pointer-events: none; z-index: 5; }
+#devilBox { min-width: 230px; display: grid; gap: 5px; }
+#blindName { font-size: 18px; color: var(--blood); }
+.bar { height: 12px; background: #2a1a12; border: 2px solid var(--line); position: relative; }
+.bar i { position: absolute; inset: 0 auto 0 0; background: repeating-linear-gradient(90deg, var(--gold) 0 6px, #b8862a 6px 8px); transition: width 0.5s steps(12); }
+#goldText { font-size: 15px; color: var(--gold); }
+#devilCards { display: flex; gap: 4px; flex-wrap: wrap; font-size: 15px; }
+#devilCards span { padding: 1px 5px; background: #e9dcc0; color: #1b1210; }
+#devilCards span.r { color: #b0201a; }
+#devilCards span.h { background: #4a1714; color: #e9dcc0; }
+#youBox { display: grid; gap: 6px; justify-items: end; text-align: right; }
+.pips { display: flex; gap: 4px; }
+.pip { width: 14px; height: 14px; background: var(--blood); box-shadow: inset -3px -3px 0 rgba(0,0,0,0.35); }
+.pip.off { background: #2b1a14; }
+.candle { width: 8px; height: 18px; background: #e9dcc0; position: relative; margin-top: 6px; }
+.candle::before { content: ""; position: absolute; left: 1px; top: -7px; width: 6px; height: 7px; background: var(--gold); }
+.candle.off { background: #3a2a22; }
+.candle.off::before { display: none; }
+
+#caption { position: fixed; left: 50%; top: calc(14px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); width: min(480px, calc(100vw - 520px)); min-width: 220px; text-align: center; font-size: 16px; line-height: 1.5; z-index: 6; pointer-events: none; }
+#caption b { color: var(--gold); font-weight: 400; }
+#caption em { color: var(--blood); font-style: normal; }
+
+#bottomL { position: fixed; left: 10px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 6px; z-index: 5; width: 300px; }
+#chambers { display: flex; gap: 5px; align-items: center; }
+.ch { width: 30px; height: 30px; border: 2px solid var(--line); display: grid; place-items: center; font-size: 13px; background: #140d0a; position: relative; }
+.ch.live { background: #4a1210; color: #ff8a7a; border-color: var(--blood); }
+.ch.blank { background: #102038; color: #9cc3ff; border-color: var(--blank); }
+.ch.empty { color: #6b5446; }
+.ch.cur { outline: 2px solid var(--gold); outline-offset: 2px; }
+.ch.used { opacity: 0.25; }
+#odds { display: grid; gap: 2px; }
+#oddsBig { font-size: 26px; }
+#oddsBig.good { color: #8fe08a; }
+#oddsBig.bad { color: #ff7a6a; }
+#handInfo { font-size: 14px; }
+#tip { font-size: 13px; color: var(--dim); line-height: 1.45; }
+
+#actions { position: fixed; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 6px; z-index: 5; width: 200px; }
+#actions button { padding: 10px; font-size: 17px; text-align: center; }
+#loadBtn { border-color: var(--gold); }
+#playBtn { background: #4a1210; border-color: var(--blood); font-size: 20px; }
+#statusLine { font-size: 13px; color: var(--dim); text-align: right; }
+
+#score { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%); z-index: 6; text-align: center; pointer-events: none; display: grid; gap: 6px; }
+#score .row { font-size: 18px; padding: 4px 12px; background: var(--panel); border: 2px solid var(--line); }
+#score .vs { font-size: 22px; color: var(--gold); }
+#score .you b { color: #8fe08a; font-weight: 400; }
+#score .dev b { color: #ff7a6a; font-weight: 400; }
+.pop { position: fixed; z-index: 7; pointer-events: none; font-family: var(--font-heavy); font-weight: 900; font-size: 34px; color: var(--gold); text-shadow: 3px 3px 0 #000; transform: translate(-50%, -50%); animation: up 1.2s steps(10) forwards; }
+@keyframes up { to { transform: translate(-50%, -160%); opacity: 0; } }
+#flash { position: fixed; inset: 0; z-index: 8; pointer-events: none; background: #fff; opacity: 0; }
+#hurt { position: fixed; inset: 0; z-index: 8; pointer-events: none; background: radial-gradient(ellipse at center, transparent 30%, rgba(160, 0, 0, 0.85)); opacity: 0; }
+
+.screen { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 16px; background: rgba(5, 3, 2, 0.72); }
+.box { width: min(520px, 100%); max-height: calc(100% - 20px); overflow: auto; background: #0e0907; border: 3px solid var(--line); padding: 22px; display: grid; gap: 14px; text-align: center; box-shadow: 8px 8px 0 #000; }
+.box h1 { margin: 0; font-family: var(--font-heavy); font-weight: 900; font-size: clamp(44px, 10vw, 72px); color: var(--blood); letter-spacing: 0.06em; text-shadow: 4px 4px 0 #000; line-height: 1; }
+.box h2 { margin: 0; font-family: var(--font-heavy); font-weight: 900; font-size: 34px; }
+.box p { margin: 0; line-height: 1.6; color: var(--ink); }
+.box .sub { color: var(--dim); font-size: 14px; }
+.rules { text-align: left; display: grid; gap: 8px; font-size: 15px; line-height: 1.55; }
+.rules b { color: var(--gold); font-weight: 400; }
+.rules em { color: var(--blood); font-style: normal; }
+.rules i { color: var(--blank); font-style: normal; }
+.box .go { padding: 12px; font-size: 20px; background: #4a1210; border-color: var(--blood); }
+.box .alt { padding: 10px; font-size: 16px; }
+.btns { display: grid; gap: 8px; }
+
+@media (max-width: 760px) {
+  #top { flex-direction: column; align-items: stretch; }
+  #devilBox { min-width: 0; }
+  #youBox { justify-items: start; text-align: left; grid-auto-flow: column; justify-content: space-between; align-items: center; }
+  #caption { width: calc(100vw - 20px); font-size: 14px; }
+  #devilBox .lbl { display: none; }
+  #bottomL { width: calc(100vw - 230px); min-width: 0; }
+  .ch { width: 22px; height: 24px; font-size: 11px; }
+  #chambers { gap: 3px; flex-wrap: wrap; }
+  #actions { width: 200px; }
+  #tip { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .pop { animation-duration: 0.01s; } .bar i { transition: none; } }
+</style>
+</head>
+<body>
+
+
+<canvas id="gl" aria-label="恶魔赌桌 3D 场景"></canvas>
+<div id="flash"></div><div id="hurt"></div>
+
+<div id="top" hidden>
+  <div id="devilBox" class="panel">
+    <div id="blindName">小盲注</div>
+    <div class="bar"><i id="goldBar" style="width:100%"></i></div>
+    <div id="goldText" class="num">恶魔金币 150 / 150</div>
+    <div class="lbl">恶魔亮出的牌</div>
+    <div id="devilCards"></div>
+  </div>
+  <div id="youBox" class="panel">
+    <div><span class="lbl">本关血量</span><div class="pips" id="hpPips"></div></div>
+    <div><span class="lbl">蜡烛（命）</span><div class="pips" id="candles"></div></div>
+    <div class="num" id="roundText">第 1 / 4 轮</div>
+  </div>
+</div>
+<div id="caption" class="panel" hidden></div>
+<div id="score" hidden><div class="row you" id="scYou"></div><div class="vs" id="scVs"></div><div class="row dev" id="scDev"></div></div>
+
+<div id="bottomL" class="panel" hidden>
+  <div class="lbl">弹巢 · 只有你知道里面是什么</div>
+  <div id="chambers"></div>
+  <div id="odds"><span class="lbl">这手牌的胜率</span><span id="oddsBig" class="num">—</span><span id="handInfo">点选手牌</span></div>
+  <div id="tip"></div>
+</div>
+<div id="actions" class="panel" hidden>
+  <button id="loadBtn">装进弹巢</button>
+  <button id="playBtn">出牌</button>
+  <button id="discardBtn">弃牌</button>
+  <div id="statusLine" class="num"></div>
+</div>
+
+<div class="screen" id="title">
+  <div class="box">
+    <h1>恶魔赌桌</h1>
+    <p class="sub">扑克 × 左轮 · 可玩原型（一个底注，三关）</p>
+    <div class="rules">
+      <span>· 恶魔身上挂满金币。<b>把他打到破产</b>就过关。每关 4 轮。</span>
+      <span>· 每轮你和恶魔比牌。<b>赢的人扣扳机。</b></span>
+      <span>· 你可以把牌塞进弹巢：<em>A 或 K 是实弹</em>，<i>Q 是空弹</i>，什么都不塞，那一格就是<em>恶魔的子弹</em>。</span>
+      <span>· 你打中他，掉出的金币 = 你这手的得分。他打中你，你掉 1 点血。</span>
+    </div>
+    <div class="btns">
+      <button class="go" id="startBtn">坐下</button>
+      <button class="alt" id="rulesBtn">完整规则</button>
+    </div>
+  </div>
+</div>
+
+<div class="screen" id="rulesScr" hidden>
+  <div class="box">
+    <h2>规则</h2>
+    <div class="rules">
+      <span><b>一关</b>：恶魔有一堆金币（小盲 150 / 大盲 200 / Boss 250）。最多 4 轮。你每关 3 点血，全局 3 根蜡烛。</span>
+      <span><b>每轮</b>：恶魔发 5 张牌，亮出 3 张（Boss 只亮 2 张）。你选 1–5 张牌出，按德州牌型计分（筹码 × 倍率）。恶魔的分数要再乘 2.5。分高的赢，平局算恶魔赢。</span>
+      <span><b>装弹</b>：出牌前，选中一张 <em>A/K（实弹）</em>或 <i>Q（空弹）</i>点「装进弹巢」。恶魔看得到你装了，但不知道装了什么。装进去的牌不能再出。</span>
+      <span><b>开枪</b>：赢的人打当前这一格，然后弹巢转一格。</span>
+      <span>· 你开枪：实弹 → 砰！金币爆出 = 你的得分；空弹或没装 → 咔。</span>
+      <span>· 恶魔开枪：实弹 <em>或没装</em> → 砰！你掉 1 点血；空弹 Q → 咔，你逃过一劫。</span>
+      <span><b>开枪牌</b>：牌堆里有 1 张。和手牌一起打出，这一轮无论输赢都由你开枪。</span>
+      <span><b>结局</b>：恶魔破产 → 过关。你的血打光 → 失去 1 根蜡烛。4 轮打完他还有钱 → 他带钱跑了（没有奖励，但不扣命）。</span>
+      <span><b>经验</b>：胜率过半就装实弹，不过半就装 Q 保命。</span>
+    </div>
+    <div class="btns"><button class="go" id="rulesClose">回到赌桌</button></div>
+  </div>
+</div>
+
+<div class="screen" id="endScr" hidden>
+  <div class="box">
+    <h2 id="endTitle"></h2>
+    <p id="endText"></p>
+    <div class="btns"><button class="go" id="endBtn"></button></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const rand = (a, b) => a + Math.random() * (b - a);
+
+  /* ═════════ poker ═════════ */
+  const SUITS = ['s', 'h', 'c', 'd'];
+  const SYM = { s: '♠', h: '♥', c: '♣', d: '♦' };
+  const RL = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
+  const rl = (r) => RL[r] || String(r);
+  const isRed = (s) => s === 'h' || s === 'd';
+  const HANDS = {
+    straight_flush: ['同花顺', 100, 8], four_kind: ['四条', 60, 7], full_house: ['葫芦', 40, 4], flush: ['同花', 35, 4],
+    straight: ['顺子', 30, 4], three_kind: ['三条', 30, 3], two_pair: ['两对', 20, 2], pair: ['对子', 10, 2], high_card: ['高牌', 5, 1],
+  };
+  const chipsOf = (c) => (c.r === 14 ? 11 : c.r >= 10 ? 10 : c.r);
+  function evaluate(cards) {
+    const by = new Map();
+    for (const c of cards) { if (!by.has(c.r)) by.set(c.r, []); by.get(c.r).push(c); }
+    const g = [...by.values()].sort((a, b) => b.length - a.length || b[0].r - a[0].r);
+    const flush = cards.length === 5 && cards.every((c) => c.s === cards[0].s);
+    const rs = [...new Set(cards.map((c) => c.r))].sort((a, b) => a - b);
+    const straight = cards.length === 5 && rs.length === 5 && (rs[4] - rs[0] === 4 || rs.join() === '2,3,4,5,14');
+    if (flush && straight) return ['straight_flush', cards];
+    if (g[0].length === 4) return ['four_kind', g[0]];
+    if (g[0].length === 3 && g[1] && g[1].length === 2) return ['full_house', cards];
+    if (flush) return ['flush', cards];
+    if (straight) return ['straight', cards];
+    if (g[0].length === 3) return ['three_kind', g[0]];
+    if (g[0].length === 2 && g[1] && g[1].length === 2) return ['two_pair', [...g[0], ...g[1]]];
+    if (g[0].length === 2) return ['pair', g[0]];
+    return ['high_card', [g[0][0]]];
+  }
+  function score(cards, mult = 1) {
+    if (!cards.length) return { type: null, name: '—', chips: 0, mult: 0, total: 0 };
+    const [type, scoring] = evaluate(cards);
+    const [name, c, m] = HANDS[type];
+    const chips = c + scoring.reduce((s, x) => s + chipsOf(x), 0);
+    return { type, name, chips, mult: m, total: Math.round(chips * m * mult) };
+  }
+  function combos(a, k, s = 0, cur = [], out = []) { if (cur.length === k) { out.push(cur.slice()); return out; } for (let i = s; i < a.length; i++) { cur.push(a[i]); combos(a, k, i + 1, cur, out); cur.pop(); } return out; }
+  function best(cards, mult = 1) { let r = null; for (let k = 1; k <= Math.min(5, cards.length); k++) for (const c of combos(cards, k)) { const s = score(c, mult); if (!r || s.total > r.total) r = { ...s, cards: c }; } return r; }
+  function freshDeck() { const d = []; for (const s of SUITS) for (let r = 2; r <= 14; r++) d.push({ r, s, id: r + s + Math.random().toString(36).slice(2, 6) }); return d; }
+  function shuffle(d) { for (let i = d.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [d[i], d[j]] = [d[j], d[i]]; } return d; }
+  const isLive = (c) => !c.gun && (c.r === 14 || c.r === 13);
+  const isBlank = (c) => !c.gun && c.r === 12;
+
+  /* ═════════ audio (starts on first click) ═════════ */
+  let ac = null;
+  const A = () => { try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume(); } catch (e) { ac = null; } return ac; };
+  function noise(dur, vol, freq, type = 'lowpass', delay = 0) {
+    const a = A(); if (!a) return;
+    const t = a.currentTime + delay, b = a.createBuffer(1, Math.ceil(a.sampleRate * dur), a.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2.2);
+    const s = a.createBufferSource(); s.buffer = b;
+    const f = a.createBiquadFilter(); f.type = type; f.frequency.value = freq;
+    const g = a.createGain(); g.gain.value = vol;
+    s.connect(f).connect(g).connect(a.destination); s.start(t);
+  }
+  function tone(freq, dur, vol = 0.2, type = 'square', slide = 1, delay = 0) {
+    const a = A(); if (!a) return;
+    const t = a.currentTime + delay, o = a.createOscillator(), g = a.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, freq * slide), t + dur);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + 0.02);
+  }
+  const SFX = {
+    bang() { noise(0.6, 1.2, 1800); tone(70, 0.5, 0.9, 'sine', 0.4); noise(1.2, 0.25, 400, 'lowpass', 0.05); },
+    click() { tone(1800, 0.03, 0.25, 'square'); tone(900, 0.04, 0.2, 'square', 1, 0.05); },
+    spin() { for (let i = 0; i < 6; i++) tone(2400 - i * 120, 0.02, 0.08, 'square', 1, i * 0.05); },
+    card() { noise(0.08, 0.35, 3000, 'highpass'); },
+    load() { tone(300, 0.06, 0.25, 'square'); noise(0.05, 0.3, 2000, 'bandpass', 0.06); tone(180, 0.08, 0.3, 'square', 1, 0.08); },
+    coins(n) { for (let i = 0; i < Math.min(n, 18); i++) tone(rand(1800, 2900), 0.08, 0.06, 'triangle', 1, i * 0.04 + rand(0, 0.03)); },
+    heart() { tone(55, 0.12, 0.6, 'sine', 0.7); tone(50, 0.12, 0.5, 'sine', 0.7, 0.22); },
+    laugh() { for (let i = 0; i < 5; i++) tone(170 - i * 12, 0.12, 0.12, 'sawtooth', 0.8, i * 0.14); },
+    win() { [0, 4, 7, 12].forEach((s, i) => tone(220 * Math.pow(2, s / 12), 0.3, 0.15, 'square', 1, i * 0.12)); },
+  };
+
+  /* ═════════ three.js · PS1 pipeline ═════════ */
+  const canvas = $('gl');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
+  renderer.setPixelRatio(1);
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color('#050403');
+  scene.fog = new THREE.Fog('#050403', 2.2, 5.5);
+  const camera = new THREE.PerspectiveCamera(55, 1, 0.05, 30);
+  const CAM_HOME = { pos: new THREE.Vector3(0, 1.38, 1.25), look: new THREE.Vector3(0, 0.98, -0.6) };
+  let portrait = false;
+  const cam = { pos: CAM_HOME.pos.clone(), look: CAM_HOME.look.clone(), tpos: CAM_HOME.pos.clone(), tlook: CAM_HOME.look.clone() };
+  let shake = 0;
+
+  // vertex snapping (wobbly PS1 geometry)
+  const snapU = { value: new THREE.Vector2(160, 120) };
+  function psx(mat) {
+    mat.onBeforeCompile = (sh) => {
+      sh.uniforms.uSnap = snapU;
+      sh.vertexShader = 'uniform vec2 uSnap;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n  vec4 sp = gl_Position; sp.xy = floor(sp.xy / sp.w * uSnap + 0.5) / uSnap * sp.w; gl_Position = sp;');
+    };
+    return mat;
+  }
+  const lam = (o) => psx(new THREE.MeshLambertMaterial(o));
+  function ctex(w, h, draw) {
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    draw(c.getContext('2d'), w, h);
+    const t = new THREE.CanvasTexture(c);
+    t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.generateMipmaps = false;
+    return t;
+  }
+
+  // low-res render target + dither/quantize pass
+  let rt = null;
+  const post = new THREE.ShaderMaterial({
+    uniforms: { tDiffuse: { value: null }, res: { value: new THREE.Vector2(320, 240) }, time: { value: 0 } },
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+    fragmentShader: `
+      uniform sampler2D tDiffuse; uniform vec2 res; uniform float time; varying vec2 vUv;
+      float b2(vec2 a){ a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }
+      float b4(vec2 a){ return b2(0.5 * a) * 0.25 + b2(a); }
+      void main(){
+        vec2 px = floor(vUv * res);
+        vec3 c = texture2D(tDiffuse, (px + 0.5) / res).rgb;
+        c += (b4(px) - 0.5) / 24.0;
+        c = floor(c * 31.0 + 0.5) / 31.0;
+        float vig = smoothstep(1.15, 0.35, length(vUv - 0.5) * 1.55);
+        c *= 0.55 + 0.45 * vig;
+        c *= 0.94 + 0.06 * mod(px.y, 2.0);
+        gl_FragColor = vec4(c, 1.0);
+      }`,
+    depthTest: false, depthWrite: false,
+  });
+  const postScene = new THREE.Scene();
+  const postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), post));
+
+  function resize() {
+    const w = innerWidth, h = innerHeight;
+    renderer.setSize(w, h, false);
+    const lowH = 270, lowW = Math.round(lowH * (w / h));
+    if (rt) rt.dispose();
+    rt = new THREE.WebGLRenderTarget(lowW, lowH, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+    post.uniforms.tDiffuse.value = rt.texture;
+    post.uniforms.res.value.set(lowW, lowH);
+    snapU.value.set(lowW / 2, lowH / 2);
+    camera.aspect = w / h;
+    portrait = w / h < 0.9;
+    camera.fov = portrait ? 80 : 55;
+    CAM_HOME.pos.set(0, portrait ? 1.5 : 1.38, portrait ? 1.4 : 1.25);
+    // phones: keep the caption just under the top panels so it never covers the hand
+    const top = $('top');
+    $('caption').style.top = w <= 760 && !top.hidden ? `${top.offsetHeight + 16}px` : '';
+    if (typeof layoutHand === 'function' && S && S.hand) layoutHand();
+    cam.tpos.copy(CAM_HOME.pos);
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', resize);
+
+  /* ═════════ the room ═════════ */
+  const ambient = new THREE.AmbientLight(0x3a3040, 0.55); scene.add(ambient);
+  const lamp = new THREE.SpotLight(0xffd9a0, 1.9, 6, 0.75, 0.6, 1.4);
+  lamp.position.set(0, 2.35, -0.35); lamp.target.position.set(0, 0.78, -0.3); scene.add(lamp, lamp.target);
+  const fill = new THREE.PointLight(0x7a2a1a, 0.5, 3); fill.position.set(0, 1.0, 0.9); scene.add(fill);
+
+  const feltTex = ctex(64, 64, (g, w, h) => { g.fillStyle = '#1d3a26'; g.fillRect(0, 0, w, h); for (let i = 0; i < 500; i++) { g.fillStyle = Math.random() < 0.5 ? '#173020' : '#24452e'; g.fillRect(Math.random() * w | 0, Math.random() * h | 0, 1, 1); } });
+  feltTex.wrapS = feltTex.wrapT = THREE.RepeatWrapping; feltTex.repeat.set(4, 4);
+  const woodTex = ctex(32, 32, (g, w, h) => { g.fillStyle = '#3a2214'; g.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 3) { g.fillStyle = y % 6 ? '#2e1a0f' : '#4a2c19'; g.fillRect(0, y, w, 1); } });
+  const brickTex = ctex(64, 64, (g, w, h) => { g.fillStyle = '#1a0f0c'; g.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 8) for (let x = ((y / 8) % 2) * 8; x < w; x += 16) { g.fillStyle = ['#2a1712', '#24140f', '#301a14'][(x + y) % 3]; g.fillRect(x + 1, y + 1, 14, 6); } });
+  brickTex.wrapS = brickTex.wrapT = THREE.RepeatWrapping; brickTex.repeat.set(6, 3);
+
+  const tableTop = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.06, 2.1), [lam({ map: woodTex }), lam({ map: woodTex }), lam({ map: feltTex }), lam({ map: woodTex }), lam({ map: woodTex }), lam({ map: woodTex })]);
+  tableTop.position.set(0, 0.75, -0.35); scene.add(tableTop);
+  const rim = new THREE.Mesh(new THREE.BoxGeometry(2.62, 0.08, 2.22), lam({ map: woodTex })); rim.position.set(0, 0.72, -0.35); scene.add(rim);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), lam({ color: 0x120c0a })); floor.rotation.x = -Math.PI / 2; scene.add(floor);
+  const room = new THREE.Mesh(new THREE.BoxGeometry(8, 4.5, 8), lam({ map: brickTex, side: THREE.BackSide })); room.position.set(0, 2.2, -1); scene.add(room);
+
+  // hanging lamp
+  const shade = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.2, 8, 1, true), lam({ color: 0x2a3a2a, side: THREE.DoubleSide })); shade.position.set(0, 2.25, -0.35); scene.add(shade);
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 4), new THREE.MeshBasicMaterial({ color: 0xffe8b0 })); bulb.position.set(0, 2.17, -0.35); scene.add(bulb);
+  const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 1.3, 4), lam({ color: 0x111111 })); cord.position.set(0, 3.0, -0.35); scene.add(cord);
+
+  /* ═════════ the devil ═════════ */
+  const devil = new THREE.Group(); devil.position.set(0, 0, -1.5); scene.add(devil);
+  const skin = lam({ color: 0x8c2a1c }), coat = lam({ color: 0x3a1010 }), bone = lam({ color: 0xd8ccb0 });
+  const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.42, 0.8, 7), coat); torso.position.y = 1.08; devil.add(torso);
+  const head = new THREE.Group(); head.position.set(0, 1.62, 0); devil.add(head);
+  head.add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.21, 0), skin));
+  const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.06, 0.12), skin); jaw.position.set(0, -0.13, 0.08); head.add(jaw);
+  const grin = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.025, 0.02), new THREE.MeshBasicMaterial({ color: 0x120404 })); grin.position.set(0, -0.08, 0.19); head.add(grin);
+  for (const sx of [-1, 1]) {
+    const horn = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.26, 5), bone); horn.position.set(sx * 0.13, 0.2, -0.02); horn.rotation.z = -sx * 0.45; head.add(horn);
+    const eye = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.025, 0.02), new THREE.MeshBasicMaterial({ color: 0xffd23a })); eye.position.set(sx * 0.075, 0.02, 0.19); head.add(eye);
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.62, 5), coat); arm.position.set(sx * 0.38, 1.0, 0.25); arm.rotation.x = 1.05; arm.rotation.z = sx * 0.15; devil.add(arm);
+    const hand = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.05, 0.14), skin); hand.position.set(sx * 0.4, 0.81, 0.52); devil.add(hand);
+  }
+  const eyeLight = new THREE.PointLight(0xff5020, 0.6, 1.6); eyeLight.position.set(0, 1.64, -1.25); scene.add(eyeLight);
+
+  // coins: worn on the coat and piled in front; visible count tracks his gold
+  const COINS = 110;
+  const coinGeo = new THREE.CylinderGeometry(0.028, 0.028, 0.008, 7);
+  const coinMat = lam({ color: 0xe8b33a, emissive: 0x3a2400 });
+  const coinIM = new THREE.InstancedMesh(coinGeo, coinMat, COINS);
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v3 = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1);
+  const coinSpots = [];
+  for (let i = 0; i < COINS; i++) {
+    if (i % 2 === 0) { // on the coat
+      const y = rand(0.75, 1.42), a = rand(-1.2, 1.2), r = 0.3 + (1.42 - y) * 0.16 + 0.01;
+      coinSpots.push({ p: new THREE.Vector3(Math.sin(a) * r, y, Math.cos(a) * r - 1.5), r: new THREE.Euler(Math.PI / 2, 0, -a) });
+    } else { // pile on the table
+      const k = (i - 1) / 2, ring = Math.floor(k / 9), ang = (k % 9) / 9 * Math.PI * 2 + ring;
+      coinSpots.push({ p: new THREE.Vector3(Math.cos(ang) * 0.06 * (1 + ring * 0.25) + (k % 2 ? 0.28 : -0.28), 0.785 + ring * 0.009, Math.sin(ang) * 0.05 - 0.98), r: new THREE.Euler(0, ang, 0) });
+    }
+  }
+  coinSpots.forEach((s, i) => { q.setFromEuler(s.r); m4.compose(s.p, q, one); coinIM.setMatrixAt(i, m4); });
+  scene.add(coinIM);
+
+  // flying coins
+  const flyers = [];
+  function burstCoins(n) {
+    for (let i = 0; i < n; i++) {
+      const m = new THREE.Mesh(coinGeo, coinMat);
+      m.position.set(rand(-0.25, 0.25), rand(0.95, 1.35), -1.25);
+      scene.add(m);
+      flyers.push({ m, v: new THREE.Vector3(rand(-0.9, 0.9), rand(1.2, 2.4), rand(0.9, 2.0)), spin: new THREE.Vector3(rand(-12, 12), rand(-12, 12), 0), rest: false });
+    }
+    while (flyers.length > 120) { const f = flyers.shift(); scene.remove(f.m); }
+  }
+  function clearFlyers() { flyers.forEach((f) => scene.remove(f.m)); flyers.length = 0; }
+
+  /* ═════════ the revolver ═════════ */
+  const gun = new THREE.Group(); scene.add(gun);
+  const steel = lam({ color: 0x5b5f66 }), dark = lam({ color: 0x24262a }), grip = lam({ map: woodTex });
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.018, 0.24, 6), steel); barrel.rotation.x = Math.PI / 2; barrel.position.set(0, 0.012, -0.15); gun.add(barrel);
+  const gunFrame = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.06, 0.12), dark); gunFrame.position.set(0, 0, -0.005); gun.add(gunFrame);
+  const drum = new THREE.Group(); drum.position.set(0, 0, -0.01); gun.add(drum);
+  const drumBody = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.042, 0.07, 6), steel); drumBody.rotation.x = Math.PI / 2; drum.add(drumBody);
+  const chamberMeshes = [];
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 0.072, 5), new THREE.MeshBasicMaterial({ color: 0x0a0a0a }));
+    hole.rotation.x = Math.PI / 2; hole.position.set(Math.cos(a) * 0.026, Math.sin(a) * 0.026, 0.001); drum.add(hole); chamberMeshes.push(hole);
+  }
+  const handle = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.11, 0.05), grip); handle.position.set(0, -0.07, 0.07); handle.rotation.x = -0.45; gun.add(handle);
+  const hammer = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.03, 0.02), dark); hammer.position.set(0, 0.04, 0.05); gun.add(hammer);
+  const flashLight = new THREE.PointLight(0xffc060, 0, 3); scene.add(flashLight);
+  const muzzle = new THREE.Mesh(new THREE.OctahedronGeometry(0.06, 0), new THREE.MeshBasicMaterial({ color: 0xffe080 })); muzzle.visible = false; gun.add(muzzle); muzzle.position.set(0, 0.012, -0.3);
+  const GUN_POSES = {
+    rest: { p: new THREE.Vector3(-0.05, 0.795, -0.22), r: new THREE.Euler(0, 0.6, Math.PI / 2) },
+    mine: { p: new THREE.Vector3(0.12, 1.08, 0.62), r: new THREE.Euler(0.16, 0.06, 0) },
+    his: { p: new THREE.Vector3(0.05, 1.22, -0.95), r: new THREE.Euler(-0.12, Math.PI, 0) },
+  };
+  const gunState = { p: GUN_POSES.rest.p.clone(), r: GUN_POSES.rest.r.clone(), target: 'rest' };
+  gun.position.copy(gunState.p); gun.rotation.copy(gunState.r);
+
+  /* ═════════ cards ═════════ */
+  const CW = 0.11, CH = 0.155;
+  const cardGeo = new THREE.PlaneGeometry(CW, CH);
+  const texCache = new Map();
+  function faceTex(c) {
+    const key = c.gun ? 'gun' : c.r + c.s;
+    if (texCache.has(key)) return texCache.get(key);
+    const t = ctex(48, 68, (g, w, h) => {
+      if (c.gun) {
+        g.fillStyle = '#4a1210'; g.fillRect(0, 0, w, h); g.fillStyle = '#c0261d'; g.fillRect(2, 2, w - 4, h - 4); g.fillStyle = '#4a1210'; g.fillRect(4, 4, w - 8, h - 8);
+        g.fillStyle = '#e9dcc0'; g.fillRect(10, 24, 26, 6); g.fillRect(28, 22, 9, 10); g.fillRect(30, 31, 7, 12); g.fillRect(14, 20, 4, 4);
+        g.font = '10px sans-serif'; g.textAlign = 'center'; g.fillText('开枪', w / 2, 58);
+        return;
+      }
+      g.fillStyle = '#e9dcc0'; g.fillRect(0, 0, w, h);
+      g.fillStyle = '#b8a888'; g.fillRect(0, h - 2, w, 2); g.fillRect(w - 2, 0, 2, h);
+      const col = isRed(c.s) ? '#b0201a' : '#1b1210';
+      g.fillStyle = col; g.textAlign = 'left'; g.textBaseline = 'top';
+      g.font = 'bold 22px monospace'; g.fillText(rl(c.r), 3, 2);
+      g.font = '15px sans-serif'; g.fillText(SYM[c.s] + '︎', 4, 24);
+      g.textAlign = 'center'; g.font = '30px sans-serif'; g.fillText(SYM[c.s] + '︎', w / 2 + 6, 30);
+      if (c.r === 14 || c.r === 13) { g.fillStyle = '#c0261d'; g.fillRect(w - 13, 3, 9, 9); g.fillStyle = '#4a1210'; g.fillRect(w - 10, 6, 3, 3); }
+      if (c.r === 12) { g.strokeStyle = '#2f6bd0'; g.lineWidth = 2; g.strokeRect(w - 13, 3, 9, 9); }
+    });
+    texCache.set(key, t);
+    return t;
+  }
+  const backTex = ctex(48, 68, (g, w, h) => { g.fillStyle = '#3a0e0c'; g.fillRect(0, 0, w, h); g.fillStyle = '#5a1612'; for (let y = 0; y < h; y += 6) for (let x = (y / 6) % 2 * 3; x < w; x += 6) g.fillRect(x, y, 3, 3); g.strokeStyle = '#e8b33a'; g.strokeRect(3, 3, w - 6, h - 6); });
+  const backMat = lam({ map: backTex });
+  class Card3D {
+    constructor(c) {
+      this.c = c;
+      this.root = new THREE.Group();
+      this.flip = new THREE.Group(); this.root.add(this.flip);
+      this.front = new THREE.Mesh(cardGeo, lam({ map: faceTex(c) }));
+      this.back = new THREE.Mesh(cardGeo, backMat); this.back.rotation.y = Math.PI;
+      this.front.userData.card = this; this.back.userData.card = this;
+      this.flip.add(this.front, this.back);
+      this.tp = new THREE.Vector3(); this.tr = new THREE.Euler(); this.tf = 0; this.fv = 0;
+      this.speed = 12;
+      scene.add(this.root);
+    }
+    place(p, r, faceUp = true, snap = false) {
+      this.tp.copy(p); this.tr.copy(r); this.tf = faceUp ? 0 : Math.PI;
+      if (snap) { this.root.position.copy(p); this.root.rotation.copy(r); this.fv = this.tf; }
+    }
+    update(dt) {
+      const k = 1 - Math.exp(-this.speed * dt);
+      this.root.position.lerp(this.tp, k);
+      this.root.rotation.x += (this.tr.x - this.root.rotation.x) * k;
+      this.root.rotation.y += (this.tr.y - this.root.rotation.y) * k;
+      this.root.rotation.z += (this.tr.z - this.root.rotation.z) * k;
+      this.fv += (this.tf - this.fv) * (1 - Math.exp(-9 * dt));
+      this.flip.rotation.y = this.fv;
+    }
+    dispose() { scene.remove(this.root); this.front.material.dispose(); }
+  }
+
+  /* ═════════ game state ═════════ */
+  const BLINDS = [
+    { name: '小盲注', gold: 150, shown: 3, mult: 2.5 },
+    { name: '大盲注', gold: 200, shown: 3, mult: 2.5 },
+    { name: 'Boss · 贪婪的恶魔', gold: 250, shown: 2, mult: 2.5 },
+  ];
+  const S = {
+    phase: 'title', blind: 0, candles: 3, hp: 3, gold: 0, maxGold: 0, round: 0, discards: 3,
+    deck: [], hand: [], sel: new Set(), chambers: [], ptr: 0, devil: [], devilSamples: [], results: [], busy: false,
+  };
+  const cards3d = new Map(); // card -> Card3D
+  const C3 = (c) => { if (!cards3d.has(c)) cards3d.set(c, new Card3D(c)); return cards3d.get(c); };
+  let playedRow = [];
+
+  function layoutHand() {
+    const n = S.hand.length, sp = Math.min(portrait ? 0.088 : 0.102, (portrait ? 0.7 : 0.82) / Math.max(n, 1));
+    const z = portrait ? 0.26 : 0.42;
+    S.hand.forEach((c, i) => {
+      const o = C3(c), off = i - (n - 1) / 2, up = S.sel.has(c);
+      o.place(new THREE.Vector3(off * sp, 0.81 + i * 0.001 + (up ? 0.03 : 0), z - (up ? 0.06 : 0) + Math.abs(off) * 0.008), new THREE.Euler(-0.95, 0, -off * 0.035));
+    });
+  }
+  function layoutDevilCards(reveal) {
+    const shown = BLINDS[S.blind].shown;
+    S.devil.forEach((c, i) => {
+      C3(c).place(new THREE.Vector3((i - 2) * 0.13, 0.785 + i * 0.001, -0.62), new THREE.Euler(-Math.PI / 2, 0, 0), reveal || i < shown);
+    });
+  }
+
+  /* ═════════ HUD ═════════ */
+  function pips(el, n, max, cls) { el.innerHTML = Array.from({ length: max }, (_, i) => `<span class="${cls}${i < n ? '' : ' off'}"></span>`).join(''); }
+  function hud() {
+    const b = BLINDS[S.blind];
+    $('blindName').textContent = `${b.name}（${S.blind + 1}/3）`;
+    $('goldBar').style.width = `${Math.max(0, S.gold / S.maxGold * 100)}%`;
+    $('goldText').textContent = `恶魔金币 ${Math.max(0, S.gold)} / ${S.maxGold}`;
+    pips($('hpPips'), S.hp, 3, 'pip'); pips($('candles'), S.candles, 3, 'candle');
+    $('roundText').textContent = `第 ${Math.min(S.round, 4)} / 4 轮`;
+    $('devilCards').innerHTML = S.devil.map((c, i) => (S.phase === 'resolve' || i < b.shown) ? `<span class="${isRed(c.s) ? 'r' : ''}">${rl(c.r)}${SYM[c.s]}</span>` : '<span class="h">？</span>').join('');
+    $('chambers').innerHTML = S.chambers.map((ch, i) => {
+      const cls = ['ch', ch.state, i === S.ptr ? 'cur' : '', ch.used ? 'used' : ''].join(' ');
+      const label = ch.state === 'live' ? '实' : ch.state === 'blank' ? '空' : '·';
+      return `<div class="${cls}" title="${ch.state === 'empty' ? '没装：恶魔开枪时这是实弹' : ''}">${label}</div>`;
+    }).join('');
+    $('statusLine').textContent = `弃牌 ${S.discards} · 牌堆 ${S.deck.length}`;
+    updateSelectionInfo();
+  }
+  function selected() { return S.hand.filter((c) => S.sel.has(c)); }
+  function winChance(play) {
+    if (!play.length) return null;
+    const s = score(play).total;
+    let w = 0; for (const d of S.devilSamples) if (s > d) w++;
+    return { p: w / S.devilSamples.length, s };
+  }
+  function updateSelectionInfo() {
+    const sel = selected(), play = sel.filter((c) => !c.gun), gunSel = sel.some((c) => c.gun);
+    const big = $('oddsBig'), info = $('handInfo'), tip = $('tip');
+    const canAct = S.phase === 'player' && !S.busy;
+    const one = sel.length === 1 ? sel[0] : null;
+    const emptySlot = S.chambers.findIndex((ch, i) => i >= S.ptr && ch.state === 'empty');
+    $('loadBtn').disabled = !canAct || !one || !(isLive(one) || isBlank(one)) || emptySlot < 0;
+    $('loadBtn').textContent = one && isLive(one) ? '装进弹巢（实弹）' : one && isBlank(one) ? '装进弹巢（空弹）' : '装进弹巢';
+    $('playBtn').disabled = !canAct || play.length < 1 || play.length > 5;
+    $('playBtn').textContent = gunSel ? '出牌并开枪' : '出牌';
+    $('discardBtn').disabled = !canAct || !sel.length || S.discards <= 0;
+    if (!canAct) { return; }
+    const cur = S.chambers[S.ptr];
+    const curTxt = cur.state === 'live' ? '当前弹位：<b>实弹</b>' : cur.state === 'blank' ? '当前弹位：空弹 Q（输了也不会中枪）' : '当前弹位：<em>没装</em>（输了就是恶魔的子弹）';
+    if (!play.length) { big.textContent = '—'; big.className = 'num'; info.textContent = gunSel ? '再选几张牌一起打出' : '点选 1–5 张手牌'; tip.innerHTML = curTxt; return; }
+    const r = winChance(play), sc = score(play);
+    info.textContent = `${sc.name} · ${sc.chips}×${sc.mult} = ${sc.total}`;
+    if (gunSel) { big.textContent = '开枪牌：必定由你开枪'; big.className = 'num good'; }
+    else { big.textContent = `${Math.round(r.p * 100)}%`; big.className = 'num ' + (r.p >= 0.5 ? 'good' : 'bad'); }
+    tip.innerHTML = curTxt + '<br>' + (gunSel ? '这一轮你必定开枪，当前弹位是实弹就必中。' : r.p >= 0.5 ? '胜率过半：适合在当前弹位装 A/K。' : '胜率不到一半：装 Q 保命，或换一手牌。');
+  }
+  function caption(html) { const c = $('caption'); if (!html) { c.hidden = true; return; } c.innerHTML = html; c.hidden = false; }
+  function popAt(world, text, color) {
+    const p = world.clone().project(camera);
+    const el = document.createElement('div'); el.className = 'pop'; el.textContent = text;
+    el.style.left = `${(p.x * 0.5 + 0.5) * innerWidth}px`; el.style.top = `${(-p.y * 0.5 + 0.5) * innerHeight}px`;
+    if (color) el.style.color = color;
+    document.body.appendChild(el); setTimeout(() => el.remove(), 1300);
+  }
+  function flash(el, a = 1, ms = 250) { el.style.transition = 'none'; el.style.opacity = a; requestAnimationFrame(() => { el.style.transition = `opacity ${ms}ms steps(6)`; el.style.opacity = 0; }); }
+
+  const LINES = {
+    load: ['嗯？你往里塞了什么？', '一张牌……是 A，还是 Q？', '我闻到火药味了。', '哈，你以为我会怕？'],
+    loadNone: ['空着的弹位……是我的。', '你什么都不装？那我替你装。'],
+    devilWin: ['轮到我了。', '把头抬起来。', '别眨眼。'],
+    youWin: ['……开枪吧，如果你有子弹。', '你的牌不错。枪呢？'],
+    click: ['咔。哈哈哈！', '空的？可惜。'],
+    hit: ['啊——我的钱！', '你这个小偷！'],
+    survive: ['运气好而已。', '下一枪就没这么幸运了。'],
+  };
+  const say = (k) => LINES[k][Math.floor(Math.random() * LINES[k].length)];
+
+  /* ═════════ flow ═════════ */
+  async function startRun() {
+    A();
+    S.blind = 0; S.candles = 3; S.results = [];
+    $('title').hidden = true; $('endScr').hidden = true;
+    ['top', 'bottomL', 'actions'].forEach((id) => ($(id).hidden = false));
+    resize();
+    await startBlind();
+  }
+  async function startBlind() {
+    const b = BLINDS[S.blind];
+    for (const o of cards3d.values()) o.dispose(); cards3d.clear(); playedRow = [];
+    clearFlyers();
+    S.gold = S.maxGold = b.gold; S.hp = 3; S.round = 0; S.discards = 3; S.sel.clear();
+    S.chambers = Array.from({ length: 6 }, () => ({ state: 'empty', used: false, card: null }));
+    S.ptr = 0;
+    S.deck = shuffle([...freshDeck(), { gun: true, id: 'gun' }]);
+    S.hand = [];
+    S.phase = 'deal'; hud();
+    caption(`<b>${b.name}</b>：恶魔身上挂着 <b>${b.gold}</b> 枚金币。${b.shown === 2 ? '<em>Boss 只亮 2 张牌。</em>' : ''}`);
+    await drawUp();
+    await wait(500);
+    await nextRound();
+  }
+  async function drawUp() {
+    while (S.hand.length < 8 && S.deck.length) {
+      const c = S.deck.shift(); S.hand.push(c);
+      const o = C3(c); o.place(new THREE.Vector3(0.9, 0.9, 0.2), new THREE.Euler(-1.2, 0, 0), true, true);
+      S.hand.sort((a, b) => (a.gun ? 99 : a.r) - (b.gun ? 99 : b.r) || String(a.s).localeCompare(String(b.s)));
+      layoutHand(); SFX.card(); await wait(70);
+    }
+    hud();
+  }
+  async function nextRound() {
+    S.round++;
+    const b = BLINDS[S.blind];
+    // devil deals himself 5 from his own deck
+    const dd = shuffle(freshDeck());
+    S.devil = dd.slice(0, 5);
+    const shown = S.devil.slice(0, b.shown), pool = dd.filter((c) => !shown.includes(c));
+    S.devilScore = best(S.devil, b.mult);
+    S.devilSamples = [];
+    for (let i = 0; i < 150; i++) { const h = shuffle(pool.slice()).slice(0, 5 - b.shown); S.devilSamples.push(best([...shown, ...h], b.mult).total); }
+    S.devil.forEach((c) => C3(c).place(new THREE.Vector3(0, 0.95, -1.3), new THREE.Euler(-Math.PI / 2, 0, 0), false, true));
+    for (let i = 0; i < 5; i++) { layoutDevilCardsPartial(i); SFX.card(); await wait(110); }
+    S.phase = 'player'; S.busy = false; hud();
+    caption(`第 ${S.round} 轮。恶魔亮出了 ${b.shown} 张牌。<br>选牌、决定往<b>当前弹位</b>装什么，然后出牌。`);
+  }
+  function layoutDevilCardsPartial(n) {
+    const shown = BLINDS[S.blind].shown;
+    S.devil.forEach((c, i) => { if (i <= n) C3(c).place(new THREE.Vector3((i - 2) * 0.13, 0.785 + i * 0.001, -0.62), new THREE.Euler(-Math.PI / 2, 0, 0), i < shown); });
+  }
+
+  async function loadSelected() {
+    const c = selected()[0];
+    if (!c || !(isLive(c) || isBlank(c))) return;
+    const idx = S.chambers.findIndex((ch, i) => i >= S.ptr && ch.state === 'empty');
+    if (idx < 0) return;
+    S.busy = true; hud();
+    S.chambers[idx].state = isLive(c) ? 'live' : 'blank'; S.chambers[idx].card = c;
+    S.hand = S.hand.filter((x) => x !== c); S.sel.delete(c);
+    const o = C3(c);
+    o.speed = 8; o.place(gun.position.clone().add(new THREE.Vector3(0, 0.03, 0)), new THREE.Euler(-Math.PI / 2, 0, 0), false);
+    layoutHand();
+    await wait(380);
+    SFX.load(); o.dispose(); cards3d.delete(c);
+    drum.rotation.z += 0.3;
+    eyeLight.intensity = 2.5;
+    caption(`恶魔：「${say('load')}」<br>你往第 ${idx + 1} 格装了${S.chambers[idx].state === 'live' ? '<em>实弹</em>' : '<b>空弹</b>'}。他看不到。`);
+    S.busy = false; hud();
+  }
+
+  async function discardSelected() {
+    const sel = selected(); if (!sel.length || S.discards <= 0) return;
+    S.busy = true; S.discards--;
+    for (const c of sel) { const o = C3(c); o.place(new THREE.Vector3(1.4, 0.9, 0.4), new THREE.Euler(-1, 0, 1), false); setTimeout(() => { o.dispose(); cards3d.delete(c); }, 600); }
+    S.hand = S.hand.filter((c) => !S.sel.has(c)); S.sel.clear(); layoutHand(); SFX.card();
+    await wait(250);
+    await drawUp();
+    S.busy = false; hud();
+  }
+
+  async function playSelected() {
+    const sel = selected(), play = sel.filter((c) => !c.gun), gunCard = sel.find((c) => c.gun);
+    if (!play.length) return;
+    S.busy = true; S.phase = 'resolve'; hud();
+    const me = score(play);
+    S.hand = S.hand.filter((c) => !S.sel.has(c)); S.sel.clear(); layoutHand();
+    playedRow = sel;
+    sel.forEach((c, i) => { C3(c).place(new THREE.Vector3((i - (sel.length - 1) / 2) * 0.13, 0.785 + i * 0.001, 0.12), new THREE.Euler(-Math.PI / 2, 0, 0), true); });
+    SFX.card();
+    await wait(450);
+    layoutDevilCards(true); SFX.card(); hud();
+    await wait(450);
+    const dv = S.devilScore;
+    const youWin = me.total > dv.total;
+    const shooterIsYou = !!gunCard || youWin;
+    $('scYou').innerHTML = `你：${me.name} ${me.chips}×${me.mult} = <b>${me.total}</b>`;
+    $('scDev').innerHTML = `恶魔：${dv.name} ${dv.chips}×${dv.mult}×2.5 = <b>${dv.total}</b>`;
+    $('scVs').textContent = gunCard ? '开枪牌！你开枪' : youWin ? '你赢了 → 你开枪' : me.total === dv.total ? '平局算恶魔赢 → 恶魔开枪' : '恶魔赢了 → 恶魔开枪';
+    $('score').hidden = false;
+    await wait(1500);
+    $('score').hidden = true;
+    await shoot(shooterIsYou, me.total);
+    // clean the table
+    for (const c of [...playedRow, ...S.devil]) { const o = C3(c); o.place(new THREE.Vector3(c === S.devil[0] ? -1.5 : 1.5, 0.85, -0.3), new THREE.Euler(-Math.PI / 2, 0, 1.5), false); setTimeout(() => { o.dispose(); cards3d.delete(c); }, 700); }
+    playedRow = []; S.devil = [];
+    hud();
+    if (S.gold <= 0) return endBlind('broke');
+    if (S.hp <= 0) return endBlind('dead');
+    if (S.round >= 4) return endBlind('escaped');
+    await wait(500);
+    await drawUp();
+    await nextRound();
+  }
+
+  function tween(ms, fn) {
+    return new Promise((res) => {
+      const t0 = performance.now();
+      const step = (now) => { const k = Math.min(1, (now - t0) / (REDUCE ? ms * 0.3 : ms)); fn(k); if (k < 1) requestAnimationFrame(step); else res(); };
+      requestAnimationFrame(step);
+    });
+  }
+  async function moveGun(to, ms) {
+    const from = { p: gun.position.clone(), r: gun.rotation.clone() }, T = GUN_POSES[to];
+    await tween(ms, (k) => {
+      const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      gun.position.lerpVectors(from.p, T.p, e);
+      gun.rotation.set(from.r.x + (T.r.x - from.r.x) * e, from.r.y + (T.r.y - from.r.y) * e, from.r.z + (T.r.z - from.r.z) * e);
+    });
+  }
+  async function shoot(you, damage) {
+    const ch = S.chambers[S.ptr];
+    if (you) {
+      caption(`恶魔：「${say('youWin')}」`);
+      cam.tlook.set(0, 1.25, -1.4);
+      await moveGun('mine', 700);
+    } else {
+      caption(`恶魔：「${say('devilWin')}」`);
+      await moveGun('his', 900);
+      cam.tpos.copy(CAM_HOME.pos).add(new THREE.Vector3(0, -0.04, -0.12));
+      cam.tlook.copy(gun.position);
+      for (let i = 0; i < 3; i++) { SFX.heart(); await wait(520); }
+    }
+    SFX.spin();
+    const z0 = drum.rotation.z;
+    await tween(380, (k) => { drum.rotation.z = z0 + k * (Math.PI / 3); });
+    await wait(you ? 350 : 650);
+    const fires = you ? ch.state === 'live' : ch.state !== 'blank';
+    ch.used = true; S.ptr++;
+    if (fires) {
+      SFX.bang(); shake = 0.6; muzzle.visible = true; flashLight.position.copy(gun.position); flashLight.intensity = 6;
+      flash($('flash'), 0.9, 160);
+      setTimeout(() => { muzzle.visible = false; }, 90);
+      if (you) {
+        const dmg = Math.min(damage, S.gold);
+        S.gold -= damage;
+        head.rotation.x = -0.5; torso.rotation.x = -0.15;
+        burstCoins(Math.max(8, Math.min(40, Math.round(dmg / 5))));
+        setTimeout(() => SFX.coins(Math.round(dmg / 8)), 150);
+        popAt(new THREE.Vector3(0, 1.45, -1.3), `-${damage}`, '#e8b33a');
+        caption(`<b>砰！</b>金币哗啦啦爆了一地：<b>-${damage}</b>。恶魔：「${say('hit')}」`);
+      } else {
+        S.hp--;
+        flash($('hurt'), 1, 900);
+        caption(ch.state === 'empty' ? '<em>砰！</em>这一格你没装弹，它就是恶魔的子弹。你掉了 1 点血。' : '<em>砰！</em>你自己装的实弹……你掉了 1 点血。');
+      }
+    } else {
+      SFX.click();
+      if (you) { caption(`<b>咔。</b>${ch.state === 'blank' ? '是你装的空弹 Q。' : '这一格没装弹。'}恶魔：「${say('click')}」`); SFX.laugh(); }
+      else caption(`<b>咔。</b>${ch.state === 'blank' ? '是你装的空弹 Q，救了你一命。' : ''}恶魔：「${say('survive')}」`);
+    }
+    hud();
+    await wait(1400);
+    head.rotation.x = 0; torso.rotation.x = 0;
+    cam.tpos.copy(CAM_HOME.pos); cam.tlook.copy(CAM_HOME.look);
+    await moveGun('rest', 600);
+  }
+
+  async function endBlind(kind) {
+    S.phase = 'end'; hud();
+    const b = BLINDS[S.blind];
+    let title, text, color;
+    if (kind === 'broke') { title = '恶魔破产了！'; text = `你在第 ${S.round} 轮把他打空。完整版里，这里会进入商店。`; color = 'var(--gold)'; SFX.win(); }
+    else if (kind === 'dead') { S.candles--; title = '你倒下了'; text = `血量打光，失去一根蜡烛。剩余蜡烛：${S.candles}。`; color = 'var(--blood)'; }
+    else { title = '恶魔带着钱跑了'; text = `4 轮打完，他还剩 ${S.gold} 枚金币（差 ${Math.round(S.gold / S.maxGold * 100)}%）。没有奖励，但你还活着。`; color = 'var(--dim)'; }
+    S.results.push({ name: b.name, kind });
+    await wait(600);
+    const last = S.blind >= 2 || S.candles <= 0;
+    $('endTitle').textContent = S.candles <= 0 ? '游戏结束' : title;
+    $('endTitle').style.color = S.candles <= 0 ? 'var(--blood)' : color;
+    if (last) {
+      const sum = S.results.map((r) => `${r.name}：${r.kind === 'broke' ? '破产' : r.kind === 'dead' ? '你倒下' : '逃跑'}`).join(' · ');
+      text += `<br><br>${sum}<br>剩余蜡烛 ${S.candles} / 3`;
+      $('endBtn').textContent = '再来一局';
+    } else $('endBtn').textContent = `下一关：${BLINDS[S.blind + 1].name}`;
+    $('endText').innerHTML = text;
+    $('endScr').hidden = false;
+  }
+  async function afterEnd() {
+    $('endScr').hidden = true;
+    if (S.blind >= 2 || S.candles <= 0) return startRun();
+    S.blind++;
+    await startBlind();
+  }
+
+  /* ═════════ input ═════════ */
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  canvas.addEventListener('pointerdown', (ev) => {
+    A();
+    if (S.phase !== 'player' || S.busy) return;
+    ndc.set((ev.clientX / innerWidth) * 2 - 1, -(ev.clientY / innerHeight) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    const meshes = S.hand.flatMap((c) => [C3(c).front, C3(c).back]);
+    const hit = ray.intersectObjects(meshes, false)[0];
+    if (!hit) return;
+    const c = hit.object.userData.card.c;
+    if (S.sel.has(c)) S.sel.delete(c);
+    else if (c.gun || selected().filter((x) => !x.gun).length < 5) S.sel.add(c);
+    SFX.card(); layoutHand(); hud();
+  });
+  $('loadBtn').onclick = loadSelected;
+  $('playBtn').onclick = playSelected;
+  $('discardBtn').onclick = discardSelected;
+  $('startBtn').onclick = startRun;
+  $('rulesBtn').onclick = () => { $('rulesScr').hidden = false; };
+  $('rulesClose').onclick = () => { $('rulesScr').hidden = true; };
+  $('endBtn').onclick = afterEnd;
+  window.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !$('playBtn').disabled) playSelected(); });
+
+  /* ═════════ loop ═════════ */
+  let last = performance.now(), t = 0;
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now; t += dt;
+    for (const o of cards3d.values()) o.update(dt);
+    // flying coins
+    for (const f of flyers) {
+      if (f.rest) continue;
+      f.v.y -= 6 * dt; f.m.position.addScaledVector(f.v, dt);
+      f.m.rotation.x += f.spin.x * dt; f.m.rotation.y += f.spin.y * dt;
+      if (f.m.position.y < 0.785 && f.m.position.z > -1.35 && f.m.position.z < 0.7 && Math.abs(f.m.position.x) < 1.2) {
+        f.m.position.y = 0.785; f.v.multiplyScalar(0.35); f.v.y = Math.abs(f.v.y) * 0.3;
+        if (f.v.length() < 0.25) { f.rest = true; f.m.rotation.set(0, Math.random() * 6, 0); }
+      }
+      if (f.m.position.y < -1) f.rest = true;
+    }
+    // devil gold on his body
+    coinIM.count = Math.max(0, Math.round(COINS * Math.max(0, S.gold) / Math.max(1, S.maxGold || 1)));
+    if (S.phase === 'title') coinIM.count = COINS;
+    // idle life
+    head.position.y = 1.62 + Math.sin(t * 1.3) * 0.01;
+    head.rotation.y = Math.sin(t * 0.7) * 0.12;
+    eyeLight.intensity += (0.6 + Math.sin(t * 9) * 0.1 - eyeLight.intensity) * 0.05;
+    lamp.intensity = 1.9 * (Math.random() < 0.015 ? 0.55 : 1);
+    flashLight.intensity *= 0.82;
+    // camera
+    cam.pos.lerp(cam.tpos, 1 - Math.exp(-4 * dt)); cam.look.lerp(cam.tlook, 1 - Math.exp(-4 * dt));
+    shake = Math.max(0, shake - dt * 1.6);
+    const sh = REDUCE ? 0 : shake * shake * 0.06;
+    camera.position.copy(cam.pos).add(new THREE.Vector3(rand(-sh, sh), rand(-sh, sh), 0));
+    camera.lookAt(cam.look);
+    // render low-res, then dither to screen
+    renderer.setRenderTarget(rt); renderer.render(scene, camera);
+    renderer.setRenderTarget(null); renderer.render(postScene, postCam);
+    requestAnimationFrame(frame);
+  }
+
+  function boot() {
+    resize();
+    // title table dressing: a few cards and the gun at rest
+    requestAnimationFrame(frame);
+  }
+  const ready = document.fonts && document.fonts.ready ? Promise.race([document.fonts.ready, wait(1500)]) : Promise.resolve();
+  ready.then(boot);
+  window.__devilTest = { S, pick(i) { S.sel.add(S.hand[i]); layoutHand(); hud(); }, load: loadSelected, play: playSelected };
+})();
+</script>
+
+</body>
+</html>
