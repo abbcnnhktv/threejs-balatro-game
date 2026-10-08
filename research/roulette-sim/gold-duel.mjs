@@ -20,9 +20,9 @@ export function playBlind(pol, rng, cfg, S) {
   let hand = deck.splice(0, 8), gold = cfg.devilGold, hp = cfg.hp, discards = 3;
   for (let round = 0; round < 4; round++) {
     // devil's hand: 5 from his own deck, 3 shown
-    const dd = shuffle(fresh(), rng); const devil = dd.slice(0, 5), up = devil.slice(0, 3), pool = dd.slice(5);
+    const dd = shuffle(fresh(), rng); const devil = dd.slice(0, 5), up = devil.slice(0, cfg.shown || 3), pool = dd.filter((c) => !up.includes(c));
     const devilScore = score(bestPlay(devil, cfg.devilMult).cards, cfg.devilMult);
-    const samples = []; for (let i = 0; i < 30; i++) { const h = shuffle(pool.slice(), rng).slice(0, 2); samples.push(bestPlay([...up, ...h], cfg.devilMult).score); }
+    const samples = []; for (let i = 0; i < 30; i++) { const h = shuffle(pool.slice(), rng).slice(0, 5 - up.length); samples.push(bestPlay([...up, ...h], cfg.devilMult).score); }
     const pWin = (s) => samples.filter((x) => s > x).length / samples.length;
     // dig for ammo with discards
     let cards = hand.filter((c) => !c.gun);

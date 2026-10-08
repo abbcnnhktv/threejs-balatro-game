@@ -102,7 +102,22 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .box .alt { padding: 10px; font-size: 16px; }
 .btns { display: grid; gap: 8px; }
 
+#coach { position: fixed; left: 10px; top: 30%; width: 300px; z-index: 9; background: #120b08; border: 3px solid var(--gold); padding: 12px 14px; display: grid; gap: 10px; box-shadow: 6px 6px 0 #000; }
+#coach .step { font-size: 12px; color: var(--dim); letter-spacing: 0.1em; }
+#coach .txt { font-size: 17px; line-height: 1.55; }
+#coach .txt b { color: var(--gold); font-weight: 400; }
+#coach .txt em { color: var(--blood); font-style: normal; }
+#coach .txt i { color: var(--blank); font-style: normal; }
+#coach button { padding: 8px; font-size: 16px; border-color: var(--gold); }
+.hl { outline: 3px solid var(--gold) !important; outline-offset: 3px; animation: blink 0.8s steps(2) infinite; }
+@keyframes blink { 50% { outline-color: transparent; } }
+#steps { display: flex; gap: 4px; font-size: 13px; color: var(--dim); justify-content: space-between; }
+#steps span.on { color: var(--gold); }
+#legend { font-size: 12px; color: var(--dim); }
+#tip em { color: #ff7a6a; font-style: normal; }
+#tip b { color: var(--gold); font-weight: 400; }
 @media (max-width: 760px) {
+  #coach { left: 8px; right: 8px; width: auto; top: auto; bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
   #top { flex-direction: column; align-items: stretch; }
   #devilBox { min-width: 0; }
   #youBox { justify-items: start; text-align: left; grid-auto-flow: column; justify-content: space-between; align-items: center; }
@@ -143,15 +158,19 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 <div id="bottomL" class="panel" hidden>
   <div class="lbl">弹巢 · 只有你知道里面是什么</div>
   <div id="chambers"></div>
+  <div id="legend">实 = A/K　空 = Q　· = 没装（输了就是恶魔的子弹）</div>
   <div id="odds"><span class="lbl">这手牌的胜率</span><span id="oddsBig" class="num">—</span><span id="handInfo">点选手牌</span></div>
   <div id="tip"></div>
 </div>
 <div id="actions" class="panel" hidden>
+  <div id="steps"><span id="st1">① 选牌</span><span id="st2">② 装弹</span><span id="st3">③ 出牌</span></div>
   <button id="loadBtn">装进弹巢</button>
   <button id="playBtn">出牌</button>
   <button id="discardBtn">弃牌</button>
   <div id="statusLine" class="num"></div>
 </div>
+
+<div id="coach" hidden><div class="step" id="coachStep"></div><div class="txt" id="coachTxt"></div><button id="coachNext">下一步 ▸</button></div>
 
 <div class="screen" id="title">
   <div class="box">
@@ -164,7 +183,8 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
       <span>· 你打中他，掉出的金币 = 你这手的得分。他打中你，你掉 1 点血。</span>
     </div>
     <div class="btns">
-      <button class="go" id="startBtn">坐下</button>
+      <button class="go" id="tutBtn">新手教程（推荐，约 2 分钟）</button>
+      <button class="alt" id="startBtn">直接开始</button>
       <button class="alt" id="rulesBtn">完整规则</button>
     </div>
   </div>
@@ -516,6 +536,9 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
     { name: '大盲注', gold: 200, shown: 3, mult: 2.5 },
     { name: 'Boss · 贪婪的恶魔', gold: 250, shown: 2, mult: 2.5 },
   ];
+  const TUT_BLIND = { name: '练习局', gold: 100, shown: 3, mult: 2.5 };
+  const getBlind = () => (TUT.active ? TUT_BLIND : BLINDS[S.blind]);
+  const TUT = { active: false, expect: null, resolve: null, glow: new Set(), onRoundEnd: null, roundWaiter: null };
   const S = {
     phase: 'title', blind: 0, candles: 3, hp: 3, gold: 0, maxGold: 0, round: 0, discards: 3,
     deck: [], hand: [], sel: new Set(), chambers: [], ptr: 0, devil: [], devilSamples: [], results: [], busy: false,
@@ -533,7 +556,7 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
     });
   }
   function layoutDevilCards(reveal) {
-    const shown = BLINDS[S.blind].shown;
+    const shown = getBlind().shown;
     S.devil.forEach((c, i) => {
       C3(c).place(new THREE.Vector3((i - 2) * 0.13, 0.785 + i * 0.001, -0.62), new THREE.Euler(-Math.PI / 2, 0, 0), reveal || i < shown);
     });
@@ -542,8 +565,8 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
   /* ═════════ HUD ═════════ */
   function pips(el, n, max, cls) { el.innerHTML = Array.from({ length: max }, (_, i) => `<span class="${cls}${i < n ? '' : ' off'}"></span>`).join(''); }
   function hud() {
-    const b = BLINDS[S.blind];
-    $('blindName').textContent = `${b.name}（${S.blind + 1}/3）`;
+    const b = getBlind();
+    $('blindName').textContent = TUT.active ? b.name : `${b.name}（${S.blind + 1}/3）`;
     $('goldBar').style.width = `${Math.max(0, S.gold / S.maxGold * 100)}%`;
     $('goldText').textContent = `恶魔金币 ${Math.max(0, S.gold)} / ${S.maxGold}`;
     pips($('hpPips'), S.hp, 3, 'pip'); pips($('candles'), S.candles, 3, 'candle');
@@ -575,6 +598,17 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
     $('playBtn').disabled = !canAct || play.length < 1 || play.length > 5;
     $('playBtn').textContent = gunSel ? '出牌并开枪' : '出牌';
     $('discardBtn').disabled = !canAct || !sel.length || S.discards <= 0;
+    if (TUT.active) {
+      const ex = TUT.expect && TUT.expect.type;
+      $('loadBtn').disabled = $('loadBtn').disabled || ex !== 'load';
+      $('playBtn').disabled = $('playBtn').disabled || ex !== 'play';
+      $('discardBtn').disabled = true;
+      if (ex === 'select' && sameSet(sel, TUT.expect.ids)) tutHit('select');
+    }
+    const cur0 = S.chambers[S.ptr];
+    $('st1').className = canAct && !sel.length ? 'on' : '';
+    $('st2').className = canAct && sel.length && cur0 && cur0.state === 'empty' ? 'on' : '';
+    $('st3').className = canAct && sel.length && cur0 && cur0.state !== 'empty' ? 'on' : '';
     if (!canAct) { return; }
     const cur = S.chambers[S.ptr];
     const curTxt = cur.state === 'live' ? '当前弹位：<b>实弹</b>' : cur.state === 'blank' ? '当前弹位：空弹 Q（输了也不会中枪）' : '当前弹位：<em>没装</em>（输了就是恶魔的子弹）';
@@ -583,7 +617,8 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
     info.textContent = `${sc.name} · ${sc.chips}×${sc.mult} = ${sc.total}`;
     if (gunSel) { big.textContent = '开枪牌：必定由你开枪'; big.className = 'num good'; }
     else { big.textContent = `${Math.round(r.p * 100)}%`; big.className = 'num ' + (r.p >= 0.5 ? 'good' : 'bad'); }
-    tip.innerHTML = curTxt + '<br>' + (gunSel ? '这一轮你必定开枪，当前弹位是实弹就必中。' : r.p >= 0.5 ? '胜率过半：适合在当前弹位装 A/K。' : '胜率不到一半：装 Q 保命，或换一手牌。');
+    const warn = !gunSel && r.p < 0.5 && cur.state === 'empty' ? '<br><em>当前弹位没装，胜率又不到一半：输了就会挨枪！</em>' : '';
+    tip.innerHTML = curTxt + '<br>' + (gunSel ? '这一轮你必定开枪，当前弹位是实弹就必中。' : r.p >= 0.5 ? '<b>胜率过半</b>：适合在当前弹位装 A/K。' : '胜率不到一半：装 Q 保命，或换一手牌。') + warn;
   }
   function caption(html) { const c = $('caption'); if (!html) { c.hidden = true; return; } c.innerHTML = html; c.hidden = false; }
   function popAt(world, text, color) {
@@ -616,13 +651,13 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
     await startBlind();
   }
   async function startBlind() {
-    const b = BLINDS[S.blind];
+    const b = getBlind();
     for (const o of cards3d.values()) o.dispose(); cards3d.clear(); playedRow = [];
     clearFlyers();
     S.gold = S.maxGold = b.gold; S.hp = 3; S.round = 0; S.discards = 3; S.sel.clear();
     S.chambers = Array.from({ length: 6 }, () => ({ state: 'empty', used: false, card: null }));
     S.ptr = 0;
-    S.deck = shuffle([...freshDeck(), { gun: true, id: 'gun' }]);
+    S.deck = TUT.active ? tutorialDeck() : shuffle([...freshDeck(), { gun: true, id: 'gun' }]);
     S.hand = [];
     S.phase = 'deal'; hud();
     caption(`<b>${b.name}</b>：恶魔身上挂着 <b>${b.gold}</b> 枚金币。${b.shown === 2 ? '<em>Boss 只亮 2 张牌。</em>' : ''}`);
@@ -641,10 +676,11 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
   }
   async function nextRound() {
     S.round++;
-    const b = BLINDS[S.blind];
+    const b = getBlind();
     // devil deals himself 5 from his own deck
     const dd = shuffle(freshDeck());
-    S.devil = dd.slice(0, 5);
+    S.devil = TUT.active ? TUT_DEVIL[S.round - 1].map(mk) : dd.slice(0, 5);
+    if (TUT.active) { const ids = new Set(S.devil.map((c) => c.r + c.s)); dd.splice(0, dd.length, ...dd.filter((c) => !ids.has(c.r + c.s)), ...S.devil); }
     const shown = S.devil.slice(0, b.shown), pool = dd.filter((c) => !shown.includes(c));
     S.devilScore = best(S.devil, b.mult);
     S.devilSamples = [];
@@ -652,10 +688,11 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
     S.devil.forEach((c) => C3(c).place(new THREE.Vector3(0, 0.95, -1.3), new THREE.Euler(-Math.PI / 2, 0, 0), false, true));
     for (let i = 0; i < 5; i++) { layoutDevilCardsPartial(i); SFX.card(); await wait(110); }
     S.phase = 'player'; S.busy = false; hud();
-    caption(`第 ${S.round} 轮。恶魔亮出了 ${b.shown} 张牌。<br>选牌、决定往<b>当前弹位</b>装什么，然后出牌。`);
+    caption(TUT.active ? '' : `第 ${S.round} 轮。恶魔亮出了 ${b.shown} 张牌。<br>选牌、决定往<b>当前弹位</b>装什么，然后出牌。`);
+    if (TUT.roundWaiter) { const r = TUT.roundWaiter; TUT.roundWaiter = null; r(); }
   }
   function layoutDevilCardsPartial(n) {
-    const shown = BLINDS[S.blind].shown;
+    const shown = getBlind().shown;
     S.devil.forEach((c, i) => { if (i <= n) C3(c).place(new THREE.Vector3((i - 2) * 0.13, 0.785 + i * 0.001, -0.62), new THREE.Euler(-Math.PI / 2, 0, 0), i < shown); });
   }
 
@@ -676,6 +713,7 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
     eyeLight.intensity = 2.5;
     caption(`恶魔：「${say('load')}」<br>你往第 ${idx + 1} 格装了${S.chambers[idx].state === 'live' ? '<em>实弹</em>' : '<b>空弹</b>'}。他看不到。`);
     S.busy = false; hud();
+    tutHit('load');
   }
 
   async function discardSelected() {
@@ -691,6 +729,7 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
   async function playSelected() {
     const sel = selected(), play = sel.filter((c) => !c.gun), gunCard = sel.find((c) => c.gun);
     if (!play.length) return;
+    tutHit('play');
     S.busy = true; S.phase = 'resolve'; hud();
     const me = score(play);
     S.hand = S.hand.filter((c) => !S.sel.has(c)); S.sel.clear(); layoutHand();
@@ -704,12 +743,13 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
     const youWin = me.total > dv.total;
     const shooterIsYou = !!gunCard || youWin;
     $('scYou').innerHTML = `你：${me.name} ${me.chips}×${me.mult} = <b>${me.total}</b>`;
-    $('scDev').innerHTML = `恶魔：${dv.name} ${dv.chips}×${dv.mult}×2.5 = <b>${dv.total}</b>`;
+    $('scDev').innerHTML = `恶魔：${dv.name} = <b>${dv.total}</b>`;
     $('scVs').textContent = gunCard ? '开枪牌！你开枪' : youWin ? '你赢了 → 你开枪' : me.total === dv.total ? '平局算恶魔赢 → 恶魔开枪' : '恶魔赢了 → 恶魔开枪';
     $('score').hidden = false;
     await wait(1500);
     $('score').hidden = true;
     await shoot(shooterIsYou, me.total);
+    if (TUT.active && TUT.onRoundEnd) { const f = TUT.onRoundEnd; TUT.onRoundEnd = null; await f(); }
     // clean the table
     for (const c of [...playedRow, ...S.devil]) { const o = C3(c); o.place(new THREE.Vector3(c === S.devil[0] ? -1.5 : 1.5, 0.85, -0.3), new THREE.Euler(-Math.PI / 2, 0, 1.5), false); setTimeout(() => { o.dispose(); cards3d.delete(c); }, 700); }
     playedRow = []; S.devil = [];
@@ -787,7 +827,15 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
   async function endBlind(kind) {
     S.phase = 'end'; hud();
-    const b = BLINDS[S.blind];
+    if (TUT.active) {
+      SFX.win(); coachHide(); await wait(700);
+      $('endTitle').textContent = '教程完成'; $('endTitle').style.color = 'var(--gold)';
+      $('endText').innerHTML = '记住三件事：<br><br>1. 比牌赢的人开枪。<br>2. 有把握就装 <em style="color:var(--blood);font-style:normal">A/K（实弹）</em>，没把握就装 <span style="color:var(--blank)">Q（空弹）</span>保命。<br>3. 弹位空着 = 恶魔的子弹。<br><br>口诀：<b style="color:var(--gold);font-weight:400">胜率过半装实弹，不过半装 Q。</b><br><br>正式游戏有三关：小盲、大盲、Boss（Boss 只亮 2 张牌）。';
+      $('endBtn').textContent = '开始正式游戏';
+      $('endScr').hidden = false;
+      return;
+    }
+    const b = getBlind();
     let title, text, color;
     if (kind === 'broke') { title = '恶魔破产了！'; text = `你在第 ${S.round} 轮把他打空。完整版里，这里会进入商店。`; color = 'var(--gold)'; SFX.win(); }
     else if (kind === 'dead') { S.candles--; title = '你倒下了'; text = `血量打光，失去一根蜡烛。剩余蜡烛：${S.candles}。`; color = 'var(--blood)'; }
@@ -807,9 +855,79 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
   }
   async function afterEnd() {
     $('endScr').hidden = true;
+    if (TUT.active) { TUT.active = false; TUT.glow.clear(); return startRun(); }
     if (S.blind >= 2 || S.candles <= 0) return startRun();
     S.blind++;
     await startBlind();
+  }
+
+  /* ═════════ tutorial ═════════ */
+  const mk = (k) => ({ r: +k.slice(0, -1), s: k.slice(-1), id: k });
+  // scripted cards: round 1 → pair of 9s + A, round 2 → junk + Q, round 3 → J J + K + gun card
+  function tutorialDeck() {
+    const order = ['14s', '9h', '9d', '12c', '5s', '7d', '2h', '3c', '10c', '6c', '8s', '11s', '11h', '13d'].map(mk);
+    order.push({ gun: true, id: 'gun' });
+    const used = new Set(order.map((c) => c.id));
+    const rest = shuffle(freshDeck().filter((c) => !used.has(c.r + c.s))).map((c) => mk(c.r + c.s));
+    const deck = [...order.slice(0, 11), ...order.slice(11)];
+    return [...deck, ...rest];
+  }
+  const TUT_DEVIL = [['2c', '3d', '7s', '4h', '8c'], ['13s', '13h', '13c', '5d', '2s'], ['4s', '6h', '10d', '3c', '2d']];
+  const sameSet = (sel, ids) => sel.length === ids.length && sel.every((c) => ids.includes(c.id));
+  let hlEls = [];
+  function coachShow(stepText, html, ids = [], withNext = false) {
+    hlEls.forEach((el) => el.classList.remove('hl')); hlEls = ids.map((id) => $(id)).filter(Boolean);
+    hlEls.forEach((el) => el.classList.add('hl'));
+    $('coachStep').textContent = stepText; $('coachTxt').innerHTML = html;
+    $('coachNext').hidden = !withNext; $('coach').hidden = false;
+  }
+  function coachHide() { $('coach').hidden = true; hlEls.forEach((el) => el.classList.remove('hl')); hlEls = []; TUT.glow.clear(); }
+  function tutHit(type) { if (TUT.expect && TUT.expect.type === type && TUT.resolve) { const r = TUT.resolve; TUT.expect = null; TUT.resolve = null; r(); } }
+  const expect = (type, data = {}) => new Promise((res) => { TUT.expect = { type, ...data }; TUT.resolve = res; hud(); });
+  const info = (n, html, ids = []) => { coachShow(n, html, ids, true); return expect('next'); };
+  const pickStep = (n, html, ids, glow) => { TUT.glow = new Set(glow || ids); coachShow(n, html, []); return expect('select', { ids }); };
+  const actStep = (n, html, type, btn) => { coachShow(n, html, [btn]); return expect(type); };
+  const roundStarted = () => new Promise((res) => { TUT.roundWaiter = res; });
+
+  async function startTutorial() {
+    A();
+    TUT.active = true; TUT.glow.clear();
+    S.candles = 3; S.results = [];
+    $('title').hidden = true; $('endScr').hidden = true;
+    ['top', 'bottomL', 'actions'].forEach((id) => ($(id).hidden = false));
+    resize();
+    const r1 = roundStarted();
+    startBlind();
+    await r1;
+    await info('教程 1/9', '对面是<b>恶魔</b>。他身上挂着 <b>100 枚金币</b>（左上角的金条）。<br>把他的金币打光，你就赢了。', ['devilBox']);
+    await info('教程 2/9', '每一轮你和恶魔<b>比牌</b>，分数高的人赢。<br><b>赢的人拿起左轮开枪。</b><br>恶魔亮出了 3 张牌（左上角），另外 2 张扣着。', ['devilCards']);
+    await pickStep('教程 3/9', '枪里的子弹，要用你的牌来装：<br><em>A 和 K 是实弹</em>（右上角红方块），<i>Q 是空弹</i>（蓝框）。<br>点一下发光的 <b>A♠</b>。', ['14s']);
+    await actStep('教程 3/9', '点右下角「<b>装进弹巢</b>」。<br>恶魔看得到你装了，但不知道装的是什么。', 'load', 'loadBtn');
+    await info('教程 4/9', '左下角弹巢第 1 格变成了「<em>实</em>」。<br>这一轮开枪，打的就是这一格。', ['chambers']);
+    await pickStep('教程 5/9', '现在选要出的牌：点两张发光的 <b>9</b>，组成对子。', ['9h', '9d']);
+    await info('教程 5/9', '看左下角：这手牌的<b>胜率超过一半</b>。<br>你多半会赢，也就是<b>你来开枪</b>，而枪里正好是实弹。<br>口诀：<b>胜率过半装实弹。</b>', ['odds']);
+    TUT.onRoundEnd = () => info('教程 6/9', '<b>打中了！</b><br>掉出的金币 = 你这手牌的分数（56）。<br>恶魔还剩 44 枚。', ['devilBox']);
+    const r2 = roundStarted();
+    await actStep('教程 5/9', '点「<b>出牌</b>」。', 'play', 'playBtn');
+    coachHide();
+    await r2;
+    await info('教程 7/9', '这回恶魔亮出了<b>三张 K</b>，非常强。<br>你的牌赢不了他，这一轮会是<em>恶魔开枪</em>。', ['devilCards']);
+    await info('教程 7/9', '危险：<em>弹位空着，就等于恶魔的子弹</em>。<br>得往里装一张<i>空弹</i>保命。', ['chambers']);
+    await pickStep('教程 7/9', '点发光的 <i>Q♣</i>（空弹）。', ['12c']);
+    await actStep('教程 7/9', '「<b>装进弹巢</b>」。', 'load', 'loadBtn');
+    await pickStep('教程 7/9', '反正赢不了，随便出三张小牌：<b>2♥ 3♣ 5♠</b>。', ['2h', '3c', '5s']);
+    TUT.onRoundEnd = () => info('教程 8/9', '<b>咔。</b>你装的空弹 Q 救了你一命。<br>如果这格空着，你就会掉 1 点血。', ['hpPips']);
+    const r3 = roundStarted();
+    await actStep('教程 7/9', '「<b>出牌</b>」，然后看恶魔开枪。', 'play', 'playBtn');
+    coachHide();
+    await r3;
+    TUT.glow = new Set(['gun']);
+    await info('教程 9/9', '你摸到了<b>开枪牌</b>（发光的那张）。<br>和手牌一起打出，这一轮<b>无论输赢都由你开枪</b>。');
+    await pickStep('教程 9/9', '先装实弹：点 <em>K♦</em>。', ['13d']);
+    await actStep('教程 9/9', '「<b>装进弹巢</b>」。', 'load', 'loadBtn');
+    await pickStep('教程 9/9', '选两张 <b>J</b> 和<b>开枪牌</b>。', ['11s', '11h', 'gun']);
+    await actStep('教程 9/9', '「<b>出牌并开枪</b>」！', 'play', 'playBtn');
+    coachHide();
   }
 
   /* ═════════ input ═════════ */
@@ -823,6 +941,7 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
     const hit = ray.intersectObjects(meshes, false)[0];
     if (!hit) return;
     const c = hit.object.userData.card.c;
+    if (TUT.active && !(TUT.expect && TUT.expect.type === 'select' && TUT.expect.ids.includes(c.id))) { SFX.click(); return; }
     if (S.sel.has(c)) S.sel.delete(c);
     else if (c.gun || selected().filter((x) => !x.gun).length < 5) S.sel.add(c);
     SFX.card(); layoutHand(); hud();
@@ -830,17 +949,23 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
   $('loadBtn').onclick = loadSelected;
   $('playBtn').onclick = playSelected;
   $('discardBtn').onclick = discardSelected;
-  $('startBtn').onclick = startRun;
+  $('startBtn').onclick = () => { TUT.active = false; startRun(); };
+  $('tutBtn').onclick = startTutorial;
+  $('coachNext').onclick = () => tutHit('next');
   $('rulesBtn').onclick = () => { $('rulesScr').hidden = false; };
   $('rulesClose').onclick = () => { $('rulesScr').hidden = true; };
   $('endBtn').onclick = afterEnd;
-  window.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !$('playBtn').disabled) playSelected(); });
+  window.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !$('playBtn').disabled) playSelected(); if (e.key === 'Enter' && !$('coach').hidden && !$('coachNext').hidden) tutHit('next'); });
 
   /* ═════════ loop ═════════ */
   let last = performance.now(), t = 0;
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000); last = now; t += dt;
-    for (const o of cards3d.values()) o.update(dt);
+    for (const o of cards3d.values()) {
+      o.update(dt);
+      const g = TUT.active && TUT.glow.has(o.c.id) ? 0.25 + 0.25 * Math.sin(t * 8) : 0;
+      o.front.material.emissive.setRGB(g, g * 0.8, 0);
+    }
     // flying coins
     for (const f of flyers) {
       if (f.rest) continue;
@@ -880,7 +1005,7 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
   }
   const ready = document.fonts && document.fonts.ready ? Promise.race([document.fonts.ready, wait(1500)]) : Promise.resolve();
   ready.then(boot);
-  window.__devilTest = { S, pick(i) { S.sel.add(S.hand[i]); layoutHand(); hud(); }, load: loadSelected, play: playSelected };
+  window.__devilTest = { S, pick(i) { S.sel.add(S.hand[i]); layoutHand(); hud(); }, pickId(id) { const c = S.hand.find((x) => x.id === id); if (c) { S.sel.add(c); layoutHand(); hud(); } return !!c; }, load: loadSelected, play: playSelected };
 })();
 </script>
 
