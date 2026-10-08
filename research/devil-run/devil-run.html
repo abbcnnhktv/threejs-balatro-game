@@ -1,0 +1,1577 @@
+<title>恶魔赌局</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Noto+Sans+SC:wght@500;900&display=swap">
+<style>
+/* Layout: the 3D table fills the screen. HUD is floating outlined text in the corners (blind/score top-left, money top-right,
+   jokers top-center, revolver right), the score calculation floats mid-screen, buttons sit under the hand. One dark look. */
+:root {
+  --ink: #f1e6cc;
+  --dim: #a3937a;
+  --blood: #e0362a;
+  --gold: #ffc23d;
+  --chip: #3d9bff;
+  --mult: #ff4a3d;
+  --green: #7fe07a;
+  --bg: #050403;
+  --font-pixel: "DotGothic16", "Noto Sans SC", "Microsoft YaHei", monospace;
+  --font-heavy: "Noto Sans SC", "DotGothic16", sans-serif;
+  --o: 2px 0 0 #000, -2px 0 0 #000, 0 2px 0 #000, 0 -2px 0 #000, 2px 2px 0 #000, -2px 2px 0 #000, 2px -2px 0 #000, -2px -2px 0 #000, 3px 4px 0 rgba(0,0,0,.6);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; overflow: hidden; background: var(--bg); color: var(--ink); font-family: var(--font-pixel); user-select: none; -webkit-user-select: none; touch-action: manipulation; text-shadow: var(--o); }
+#gl { position: fixed; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+.num { font-variant-numeric: tabular-nums; }
+button { font-family: var(--font-pixel); color: var(--ink); cursor: pointer; text-shadow: var(--o); border: 0; background: none; padding: 0; }
+button:disabled { opacity: .3; cursor: default; }
+button:focus-visible { outline: 2px dashed var(--gold); outline-offset: 4px; }
+.btn { white-space: nowrap; font-size: 20px; padding: 10px 22px 12px; border-radius: 6px; box-shadow: 0 4px 0 #000; text-shadow: 2px 2px 0 #000; transition: transform .08s; }
+.btn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 #000; }
+.btn.play { background: #2a6fd6; }
+.btn.disc { background: #c3342a; }
+.btn.gold { background: #c98a12; }
+.btn.ghost { background: rgba(255,255,255,.08); font-size: 16px; padding: 8px 14px 10px; }
+b { font-weight: 400; color: var(--gold); }
+em { font-style: normal; color: var(--blood); }
+i.c { font-style: normal; color: var(--chip); }
+i.m { font-style: normal; color: var(--mult); }
+
+#hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+#hud > * { position: absolute; }
+#hud.cine #bottom, #hud.cine #deckLbl, #hud.cine #calc,
+#hud.away #hudL, #hud.away #bottom, #hud.away #deckLbl, #hud.away #calc { visibility: hidden; }
+#hud button, #hud .jk { pointer-events: auto; }
+#hudL { left: 16px; top: calc(12px + env(safe-area-inset-top, 0px)); display: grid; gap: 2px; }
+#anteLbl { font-size: 14px; color: var(--dim); letter-spacing: .1em; }
+#blindLbl { font-family: var(--font-heavy); font-weight: 900; font-size: 26px; }
+#blindLbl.boss { color: var(--blood); }
+#bossLbl { font-size: 14px; color: #ff9b8f; }
+#scoreLine { margin-top: 6px; font-size: 15px; color: var(--dim); }
+#scoreNow { font-family: var(--font-heavy); font-weight: 900; font-size: 36px; color: var(--ink); line-height: 1.05; }
+#scoreNow.bump { animation: bump .25s; }
+#targetLbl { color: var(--mult); }
+.track { width: 210px; height: 6px; background: rgba(0,0,0,.6); margin-top: 4px; box-shadow: 0 0 0 2px #000; }
+.track i { display: block; height: 100%; width: 0; background: var(--gold); transition: width .35s steps(10); }
+#hudR { right: 16px; top: calc(12px + env(safe-area-inset-top, 0px)); text-align: right; display: grid; gap: 2px; justify-items: end; }
+#money { font-family: var(--font-heavy); font-weight: 900; font-size: 38px; color: var(--gold); line-height: 1; }
+#money.bump { animation: bump .25s; }
+#counts { font-size: 16px; }
+#helpBtn { font-size: 15px; color: var(--dim); margin-top: 4px; }
+
+#jbar { left: 50%; top: calc(12px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); display: flex; gap: 8px; }
+.jk { width: 62px; height: 86px; border-radius: 5px; padding: 5px 4px; display: grid; align-content: space-between; text-align: center; font-size: 12px; line-height: 1.2; cursor: pointer; position: relative; box-shadow: 0 0 0 2px #000, 3px 4px 0 2px rgba(0,0,0,.55); text-shadow: 1px 1px 0 #000; }
+.jk.r1 { background: linear-gradient(#3b6fb8, #23436f); }
+.jk.r2 { background: linear-gradient(#3e9a54, #23582f); }
+.jk.r3 { background: linear-gradient(#c3402f, #6b1d14); }
+.jk .face { font-size: 22px; line-height: 1; filter: drop-shadow(1px 1px 0 #000); }
+.jk.empty { background: none; box-shadow: inset 0 0 0 2px rgba(255,255,255,.12); cursor: default; }
+.jk.fire { animation: wig .35s; }
+.jk.on { outline: 3px solid var(--gold); outline-offset: 2px; }
+@keyframes wig { 25% { transform: rotate(-9deg) scale(1.15); } 60% { transform: rotate(7deg) scale(1.1); } }
+@keyframes bump { 40% { transform: scale(1.25); } }
+#jtip { position: fixed; z-index: 12; width: 210px; transform: translateX(-50%); text-align: center; display: grid; gap: 4px; font-size: 15px; line-height: 1.45; pointer-events: auto; }
+#jtip .nm { font-family: var(--font-heavy); font-weight: 900; font-size: 18px; }
+
+#gunHud { right: 18px; top: 42%; transform: translateY(-50%); display: grid; justify-items: center; gap: 6px; text-align: center; }
+#cyl { width: 92px; height: 92px; position: relative; border-radius: 50%; background: radial-gradient(circle, #2b2d31 0 30%, #17181b 31% 100%); box-shadow: 0 0 0 3px #000, 4px 5px 0 2px rgba(0,0,0,.5); transition: transform .5s cubic-bezier(.3,1.6,.5,1); }
+#cyl span { position: absolute; width: 24px; height: 24px; border-radius: 50%; background: #050506; box-shadow: inset 0 0 0 2px #000, 0 0 0 1px #3a3c42; transform: translate(-50%, -50%); }
+#cyl span.you { background: radial-gradient(circle at 35% 35%, #fff2b0, var(--gold) 45%, #8a5d08); box-shadow: 0 0 10px var(--gold); }
+#cyl span.devil { background: radial-gradient(circle at 35% 35%, #ffb0a8, var(--blood) 45%, #5e0e08); box-shadow: 0 0 10px var(--blood); }
+#cyl span.pop { animation: bump .4s 2; }
+#gunTxt { font-size: 14px; line-height: 1.5; max-width: 170px; }
+#gunOdds { font-size: 13px; color: var(--dim); line-height: 1.5; max-width: 180px; }
+
+#calc { left: 50%; top: 38%; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 6px; text-align: center; }
+#handName { font-family: var(--font-heavy); font-weight: 900; font-size: 30px; }
+#handName small { font-family: var(--font-pixel); font-weight: 400; font-size: 15px; color: var(--dim); margin-left: 6px; }
+#cm { display: flex; align-items: center; gap: 8px; font-family: var(--font-heavy); font-weight: 900; }
+#cm span { min-width: 76px; padding: 2px 10px 4px; border-radius: 5px; font-size: 30px; text-align: center; box-shadow: 0 0 0 2px #000, 3px 4px 0 2px rgba(0,0,0,.5); }
+#chipsV { background: var(--chip); }
+#multV { background: var(--mult); }
+#cm .x { font-size: 26px; color: var(--ink); }
+#cm span.bump { animation: bump .2s; }
+#est { font-size: 14px; color: var(--dim); }
+#total { font-family: var(--font-heavy); font-weight: 900; font-size: 54px; color: var(--ink); line-height: 1; }
+#total.hot { color: var(--gold); animation: burn .6s; }
+@keyframes burn { 0% { transform: scale(.6); } 40% { transform: scale(1.3); } 100% { transform: scale(1); } }
+
+#bottom { left: 50%; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: flex; gap: 12px; align-items: center; }
+#deckLbl { right: 18px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); font-size: 14px; color: var(--dim); }
+#sortBtn { font-size: 15px; color: var(--dim); white-space: nowrap; }
+
+#say { position: fixed; left: 50%; top: 13%; transform: translateX(-50%); z-index: 6; font-size: 20px; color: #ffb4a6; text-align: center; max-width: min(560px, 90vw); pointer-events: none; transition: opacity .3s; }
+#banner { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); z-index: 7; text-align: center; pointer-events: none; display: grid; gap: 8px; width: min(720px, 94vw); }
+#banner .big { font-family: var(--font-heavy); font-weight: 900; font-size: clamp(42px, 8vw, 76px); line-height: 1.05; letter-spacing: .04em; }
+#banner .sm { font-size: 18px; line-height: 1.6; }
+#banner.in { animation: slam .45s cubic-bezier(.2,1.6,.4,1); }
+@keyframes slam { 0% { transform: translate(-50%, -50%) scale(2.2); opacity: 0; } 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
+#hint { position: fixed; z-index: 9; left: 16px; top: 33%; width: 270px; font-size: 16px; line-height: 1.6; pointer-events: auto; display: grid; gap: 6px; }
+#hint .k { font-size: 13px; color: var(--gold); letter-spacing: .12em; }
+#hint button { justify-self: start; font-size: 14px; color: var(--gold); }
+#cash { position: fixed; left: 50%; top: 30%; transform: translateX(-50%); z-index: 7; display: grid; gap: 4px; min-width: 260px; font-size: 18px; pointer-events: none; }
+#cash div { display: flex; justify-content: space-between; gap: 30px; animation: slide .3s both; }
+#cash div span:last-child { color: var(--gold); }
+#cash .sum { font-family: var(--font-heavy); font-weight: 900; font-size: 30px; margin-top: 6px; }
+@keyframes slide { from { transform: translateX(-30px); opacity: 0; } }
+
+.pop { position: fixed; z-index: 8; pointer-events: none; font-family: var(--font-heavy); font-weight: 900; font-size: 28px; transform: translate(-50%, -50%); animation: up 1s cubic-bezier(.2,1.4,.4,1) forwards; white-space: nowrap; }
+.pop.c { color: var(--chip); } .pop.m { color: var(--mult); } .pop.g { color: var(--gold); } .pop.n { color: var(--dim); font-size: 20px; } .pop.big { font-size: 48px; }
+@keyframes up { 0% { transform: translate(-50%, -20%) scale(.4); opacity: 0; } 20% { transform: translate(-50%, -60%) scale(1.25); opacity: 1; } 75% { opacity: 1; } 100% { transform: translate(-50%, -140%) scale(1); opacity: 0; } }
+#flash, #hurt, #fade { position: fixed; inset: 0; pointer-events: none; opacity: 0; }
+#flash { z-index: 8; background: #fff; }
+#hurt { z-index: 8; background: radial-gradient(ellipse at center, transparent 25%, rgba(170, 0, 0, .9)); }
+#fade { z-index: 9; background: #000; transition: opacity 1.2s; }
+
+.ov { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 16px; background: radial-gradient(ellipse at center, rgba(0,0,0,.35), rgba(0,0,0,.82)); overflow: auto; }
+.ovIn { display: grid; gap: 16px; justify-items: center; text-align: center; width: min(760px, 100%); }
+.ovIn h2 { margin: 0; font-family: var(--font-heavy); font-weight: 900; font-size: 40px; letter-spacing: .06em; }
+.ovIn .sub { color: var(--dim); font-size: 15px; line-height: 1.6; }
+.row { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+.item { display: grid; gap: 8px; justify-items: center; width: 136px; }
+.card { width: 124px; height: 170px; border-radius: 8px; padding: 10px 8px; display: grid; align-content: space-between; gap: 4px; font-size: 13px; line-height: 1.45; text-shadow: 1px 1px 0 #000; box-shadow: 0 0 0 3px #000, 5px 6px 0 3px rgba(0,0,0,.5); animation: deal .45s cubic-bezier(.2,1.5,.4,1) both; }
+.card .nm { font-family: var(--font-heavy); font-weight: 900; font-size: 17px; }
+.card .face { font-size: 34px; line-height: 1; }
+.card.r1 { background: linear-gradient(#3b6fb8, #1d3a63); }
+.card.r2 { background: linear-gradient(#3e9a54, #1f4f2a); }
+.card.r3 { background: linear-gradient(#c3402f, #5e190f); }
+.card.pl { background: linear-gradient(#5a3e9e, #241645); }
+.card.sold { opacity: .25; filter: grayscale(1); }
+.item:nth-child(2) .card { animation-delay: .08s; } .item:nth-child(3) .card { animation-delay: .16s; } .item:nth-child(4) .card { animation-delay: .24s; }
+@keyframes deal { from { transform: translateY(60px) rotate(-8deg) scale(.7); opacity: 0; } }
+.price { font-size: 18px; color: var(--gold); }
+.item .btn { font-size: 16px; padding: 6px 16px 8px; }
+
+#title .ovIn h1 { margin: 0; font-family: var(--font-heavy); font-weight: 900; font-size: clamp(60px, 14vw, 120px); color: var(--blood); letter-spacing: .08em; line-height: 1; text-shadow: var(--o), 0 0 40px rgba(224,54,42,.45); animation: throb 3s ease-in-out infinite; }
+@keyframes throb { 50% { text-shadow: var(--o), 0 0 70px rgba(224,54,42,.75); } }
+.lines { display: grid; gap: 8px; font-size: 17px; line-height: 1.55; max-width: 560px; text-align: left; }
+.lines span::before { content: "▸ "; color: var(--blood); }
+.rules { text-align: left; display: grid; gap: 10px; font-size: 16px; line-height: 1.6; max-width: 640px; }
+table.ht { border-collapse: collapse; font-size: 15px; }
+table.ht td { padding: 2px 12px; text-align: left; }
+table.ht td:nth-child(n+2) { text-align: right; }
+.endStats { display: grid; grid-template-columns: auto auto; gap: 4px 24px; font-size: 17px; text-align: left; }
+.endStats span:nth-child(even) { color: var(--gold); text-align: right; }
+
+@media (max-width: 760px) {
+  #jbar { top: calc(96px + env(safe-area-inset-top, 0px)); gap: 5px; }
+  .jk { width: 52px; height: 72px; font-size: 11px; }
+  .jk .face { font-size: 18px; }
+  #blindLbl { font-size: 21px; }
+  #scoreNow { font-size: 28px; }
+  #money { font-size: 30px; }
+  .track { width: 150px; }
+  #gunHud { top: calc(184px + env(safe-area-inset-top, 0px)); right: 10px; transform: none; }
+  #cyl { width: 64px; height: 64px; }
+  #cyl span { width: 16px; height: 16px; }
+  #gunTxt { font-size: 12px; max-width: 120px; }
+  #gunOdds { display: none; }
+  #calc { top: 37%; }
+  #handName { font-size: 23px; }
+  #cm span { font-size: 22px; min-width: 56px; }
+  #total { font-size: 40px; }
+  #hint { left: 12px; right: 12px; width: auto; top: 31%; font-size: 15px; }
+  #say { top: 25%; font-size: 17px; }
+  .btn { font-size: 18px; padding: 9px 18px 11px; }
+  #deckLbl { display: none; }
+  .card { width: 104px; height: 150px; font-size: 12px; }
+  .item { width: 110px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before { animation-duration: .01s !important; transition-duration: .01s !important; } }
+</style>
+
+<canvas id="gl" aria-label="恶魔赌局 3D 赌桌"></canvas>
+<div id="flash"></div><div id="hurt"></div><div id="fade"></div>
+
+<div id="hud" hidden>
+  <div id="hudL">
+    <div id="anteLbl" class="num">底注 1 / 8</div>
+    <div id="blindLbl">小盲注</div>
+    <div id="bossLbl" hidden></div>
+    <div id="scoreLine">得分　目标 <span id="targetLbl" class="num">300</span></div>
+    <div id="scoreNow" class="num">0</div>
+    <div class="track"><i id="scoreBar"></i></div>
+  </div>
+  <div id="jbar"></div>
+  <div id="hudR">
+    <div id="money" class="num">$4</div>
+    <div id="counts" class="num"><i class="c">出牌 4</i>　<i class="m">弃牌 3</i></div>
+    <button id="helpBtn">规则 / 牌型 ?</button>
+  </div>
+  <div id="gunHud">
+    <div id="cyl"></div>
+    <div id="gunTxt"></div>
+    <div id="gunOdds"></div>
+  </div>
+  <div id="calc" hidden>
+    <div id="handName"></div>
+    <div id="cm"><span id="chipsV" class="num">0</span><span class="x">×</span><span id="multV" class="num">0</span></div>
+    <div id="est" class="num"></div>
+    <div id="total" class="num" hidden></div>
+  </div>
+  <div id="bottom">
+    <button class="btn disc" id="discBtn">弃牌</button>
+    <button id="sortBtn">按点数</button>
+    <button class="btn play" id="playBtn">出牌</button>
+  </div>
+  <div id="deckLbl" class="num">牌堆 44</div>
+</div>
+<div id="say"></div>
+<div id="banner" hidden><div class="big" id="bnBig"></div><div class="sm" id="bnSm"></div></div>
+<div id="cash" hidden></div>
+<div id="hint" hidden><div class="k">提示</div><div id="hintTxt"></div><button id="hintOk">知道了 ▸</button></div>
+<div id="jtip" hidden></div>
+
+<div class="ov" id="title">
+  <div class="ovIn">
+    <h1>恶魔赌局</h1>
+    <div class="sub">小丑牌的玩法 · 一把左轮 · 八个底注</div>
+    <div class="lines">
+      <span>和小丑牌一样：每个底注打 <b>小盲、大盲、Boss</b> 三关，用德州牌型凑分，<i class="c">筹码</i> × <i class="m">倍率</i>。</span>
+      <span>每一关，<b>赢的一方往左轮里装一发自己的子弹</b>。你过关装<b>金弹</b>，没过关恶魔装<em>红弹</em>。</span>
+      <span>Boss 关的赢家装弹后<b>开枪</b>：命中率 = 自己的子弹数 / 6。</span>
+      <span>你打中，恶魔掉宝；<em>恶魔打中，你就死了</em>。只要没死，就继续。</span>
+    </div>
+    <div class="row">
+      <button class="btn play" id="startBtn">开始赌局</button>
+      <button class="btn ghost" id="rulesBtn">完整规则</button>
+    </div>
+  </div>
+</div>
+
+<div class="ov" id="help" hidden>
+  <div class="ovIn">
+    <h2>规则</h2>
+    <div class="rules">
+      <span><b>出牌</b>：每关 4 次出牌、3 次弃牌，手牌 8 张。每次选 1–5 张打出，按牌型得分：（牌型<i class="c">筹码</i> + 计分牌点数）× 牌型<i class="m">倍率</i>，再经过小丑加成。累计分数达到目标就过关。</span>
+      <span><b>装弹</b>：每关结束，赢家装 1 发自己的子弹（过关 = 你，没过关 = 恶魔）。左轮 6 个弹位，每个底注开始时清空。</span>
+      <span><b>开枪</b>：Boss 关结束，赢家装弹后立刻开枪。命中率 = 他自己的子弹 / 6。所以三关全赢，你开枪是 3/6；三关全输，恶魔开枪也是 3/6。</span>
+      <span><b>结果</b>：你打中 → 恶魔倒下，掉 $8 和一张小丑（三选一）。恶魔打中 → 你死了，游戏结束。没打中 → 什么都没发生，继续。</span>
+      <span><b>输了一关</b>不会结束游戏，只是没有过关奖励，并且送了恶魔一发子弹。</span>
+      <span><b>商店</b>：每关之后。小丑是被动加成，星球牌升级牌型。每存 $5 有 $1 利息（最多 $5）。</span>
+      <span><b>通关</b>：打赢第 8 底注的 Boss。活着离开也算活下来。</span>
+    </div>
+    <table class="ht" id="handTable"></table>
+    <button class="btn play" id="helpClose">回到赌桌</button>
+  </div>
+</div>
+
+<div class="ov" id="shop" hidden>
+  <div class="ovIn">
+    <h2>商店</h2>
+    <div class="sub" id="shopSub"></div>
+    <div class="row" id="shopRow"></div>
+    <div class="row">
+      <button class="btn gold" id="rerollBtn">刷新 $4</button>
+      <button class="btn play" id="nextBtn">下一关 ▸</button>
+    </div>
+  </div>
+</div>
+
+<div class="ov" id="pick" hidden>
+  <div class="ovIn">
+    <h2 style="color:var(--gold)">恶魔的遗物</h2>
+    <div class="sub" id="pickSub">选一张小丑带走</div>
+    <div class="row" id="pickRow"></div>
+    <button class="btn ghost" id="pickSkip">都不要</button>
+  </div>
+</div>
+
+<div class="ov" id="end" hidden>
+  <div class="ovIn">
+    <h2 id="endTitle"></h2>
+    <div class="sub" id="endSub"></div>
+    <div class="endStats" id="endStats"></div>
+    <button class="btn play" id="againBtn">再来一局</button>
+  </div>
+</div>
+
+<script>/* 恶魔赌局 · shared rules. The simulator (Node) and the playable demo (browser) both run this file,
+   so the numbers in the report are the numbers you play. No DOM, no randomness of its own: pass an rng. */
+(function (root) {
+  'use strict';
+
+  /* ───────────── cards & hands ───────────── */
+  const SUITS = ['s', 'h', 'c', 'd'];
+  const SUIT_SYM = { s: '♠', h: '♥', c: '♣', d: '♦' };
+  const SUIT_NAME = { s: '黑桃', h: '红心', c: '梅花', d: '方块' };
+  const RANK_LABEL = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
+  const rankLabel = (r) => RANK_LABEL[r] || String(r);
+  const cardChips = (c) => (c.r === 14 ? 11 : c.r >= 10 ? 10 : c.r);
+  const isFace = (c) => c.r >= 11 && c.r <= 13;
+
+  let uid = 0;
+  function makeDeck() {
+    const d = [];
+    for (const s of SUITS) for (let r = 2; r <= 14; r++) d.push({ r, s, id: 'c' + uid++ });
+    return d;
+  }
+  function shuffle(a, rng) {
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; }
+    return a;
+  }
+
+  // [name, chips, mult, +chips per level, +mult per level]
+  const HANDS = {
+    straight_flush: ['同花顺', 100, 8, 40, 4],
+    four_kind: ['四条', 60, 7, 30, 3],
+    full_house: ['葫芦', 40, 4, 25, 2],
+    flush: ['同花', 35, 4, 15, 2],
+    straight: ['顺子', 30, 4, 30, 3],
+    three_kind: ['三条', 30, 3, 20, 2],
+    two_pair: ['两对', 20, 2, 20, 1],
+    pair: ['对子', 10, 2, 15, 1],
+    high_card: ['高牌', 5, 1, 10, 1],
+  };
+  const HAND_ORDER = Object.keys(HANDS);
+
+  function evaluate(cards) {
+    const n = cards.length;
+    const byRank = {};
+    for (const c of cards) (byRank[c.r] = byRank[c.r] || []).push(c);
+    const groups = Object.values(byRank).sort((a, b) => b.length - a.length || b[0].r - a[0].r);
+    const flush = n === 5 && cards.every((c) => c.s === cards[0].s);
+    let straight = false;
+    if (n === 5 && groups.length === 5) {
+      const rs = cards.map((c) => c.r).sort((a, b) => a - b);
+      straight = rs[4] - rs[0] === 4 || (rs[0] === 2 && rs[1] === 3 && rs[2] === 4 && rs[3] === 5 && rs[4] === 14);
+    }
+    if (flush && straight) return { type: 'straight_flush', scoring: cards };
+    if (groups[0].length === 4) return { type: 'four_kind', scoring: groups[0] };
+    if (groups[0].length === 3 && groups[1] && groups[1].length === 2) return { type: 'full_house', scoring: cards };
+    if (flush) return { type: 'flush', scoring: cards };
+    if (straight) return { type: 'straight', scoring: cards };
+    if (groups[0].length === 3) return { type: 'three_kind', scoring: groups[0] };
+    if (groups[0].length === 2 && groups[1] && groups[1].length === 2) return { type: 'two_pair', scoring: groups[0].concat(groups[1]) };
+    if (groups[0].length === 2) return { type: 'pair', scoring: groups[0] };
+    return { type: 'high_card', scoring: [groups[0][0]] };
+  }
+  // one pass: hand type, scoring cards and which hand types the play "contains"
+  function analyze(cards) {
+    const ev = evaluate(cards);
+    const counts = {};
+    for (const c of cards) counts[c.r] = (counts[c.r] || 0) + 1;
+    const sz = Object.values(counts).sort((a, b) => b - a);
+    const t = ev.type;
+    ev.has = {
+      high_card: true, pair: sz[0] >= 2, two_pair: sz[0] >= 2 && sz[1] >= 2, three_kind: sz[0] >= 3, four_kind: sz[0] >= 4,
+      straight: t === 'straight' || t === 'straight_flush', flush: t === 'flush' || t === 'straight_flush',
+      full_house: t === 'full_house', straight_flush: t === 'straight_flush',
+    };
+    return ev;
+  }
+  function contains(type, cards) {
+    const counts = {};
+    for (const c of cards) counts[c.r] = (counts[c.r] || 0) + 1;
+    const sizes = Object.values(counts).sort((a, b) => b - a);
+    if (type === 'pair') return sizes[0] >= 2;
+    if (type === 'two_pair') return sizes[0] >= 2 && sizes[1] >= 2;
+    if (type === 'three_kind') return sizes[0] >= 3;
+    const e = evaluate(cards).type;
+    if (type === 'straight') return e === 'straight' || e === 'straight_flush';
+    if (type === 'flush') return e === 'flush' || e === 'straight_flush';
+    return e === type;
+  }
+
+  /* ───────────── jokers ───────────── */
+  // onCard(card, ctx) → effect per scored card; onHand(ctx) → effect once per hand. effect: { chips, mult, xmult }
+  const suitJ = (id, name, suit, cost) => ({ id, name, cost, rarity: 1, desc: `每张计分的${SUIT_NAME[suit]}牌 +3 倍率`, onCard: (c) => (c.s === suit ? { mult: 3 } : null) });
+  const typeJ = (id, name, type, eff, cost, rarity = 1) => ({
+    id, name, cost, rarity,
+    desc: `出牌含${HANDS[type][0]}时 ${eff.xmult ? '×' + eff.xmult + ' 倍率' : eff.mult ? '+' + eff.mult + ' 倍率' : '+' + eff.chips + ' 筹码'}`,
+    onHand: (x) => (x.has[type] ? eff : null),
+  });
+  const JOKERS = [
+    { id: 'joker', name: '小丑', cost: 2, rarity: 1, desc: '+4 倍率', onHand: () => ({ mult: 4 }) },
+    suitJ('greedy', '贪婪小丑', 'd', 5), suitJ('lusty', '色欲小丑', 'h', 5), suitJ('wrath', '暴怒小丑', 's', 5), suitJ('glutton', '暴食小丑', 'c', 5),
+    typeJ('jolly', '快乐小丑', 'pair', { mult: 8 }, 3), typeJ('zany', '疯狂小丑', 'three_kind', { mult: 12 }, 4),
+    typeJ('mad', '狂躁小丑', 'two_pair', { mult: 10 }, 4), typeJ('crazy', '癫狂小丑', 'straight', { mult: 12 }, 4),
+    typeJ('droll', '滑稽小丑', 'flush', { mult: 10 }, 4), typeJ('sly', '狡猾小丑', 'pair', { chips: 50 }, 3),
+    typeJ('duo', '二重奏', 'pair', { xmult: 2 }, 8, 2), typeJ('trio', '三重奏', 'three_kind', { xmult: 3 }, 8, 2),
+    typeJ('family', '一家人', 'flush', { xmult: 2 }, 8, 2),
+    { id: 'fib', name: '斐波那契', cost: 7, rarity: 2, desc: '计分的 A/2/3/5/8 各 +8 倍率', onCard: (c) => ([14, 2, 3, 5, 8].includes(c.r) ? { mult: 8 } : null) },
+    { id: 'scary', name: '鬼脸', cost: 4, rarity: 1, desc: '计分的人头牌各 +30 筹码', onCard: (c) => (isFace(c) ? { chips: 30 } : null) },
+    { id: 'even', name: '偶数史蒂文', cost: 4, rarity: 1, desc: '计分的偶数牌各 +4 倍率', onCard: (c) => (c.r <= 10 && c.r % 2 === 0 ? { mult: 4 } : null) },
+    { id: 'odd', name: '奇数托德', cost: 4, rarity: 1, desc: '计分的奇数牌各 +31 筹码', onCard: (c) => (c.r === 14 || (c.r <= 9 && c.r % 2 === 1) ? { chips: 31 } : null) },
+    { id: 'abstract', name: '抽象小丑', cost: 4, rarity: 1, desc: '每张小丑 +3 倍率', onHand: (x) => ({ mult: 3 * x.run.jokers.length }) },
+    { id: 'half', name: '半个小丑', cost: 4, rarity: 1, desc: '出牌不超过 3 张时 +20 倍率', onHand: (x) => (x.played.length <= 3 ? { mult: 20 } : null) },
+    { id: 'green', name: '绿色小丑', cost: 4, rarity: 1, desc: '每出一手 +1 倍率，每弃一次 -1（会累积）', onHand: (x) => ({ mult: x.run.green }) },
+    { id: 'nova', name: '超新星', cost: 5, rarity: 2, desc: '这个牌型本局打过几次，就 +几 倍率', onHand: (x) => ({ mult: x.run.plays[x.type] + 1 }) },
+    { id: 'constel', name: '星座', cost: 6, rarity: 2, desc: '每用过一张星球牌，×0.1 倍率（会累积）', onHand: (x) => (x.run.planetsUsed ? { xmult: 1 + 0.1 * x.run.planetsUsed } : null) },
+    { id: 'banana', name: '大香蕉', cost: 8, rarity: 3, desc: '×3 倍率', onHand: () => ({ xmult: 3 }) },
+    { id: 'bull', name: '公牛', cost: 6, rarity: 2, desc: '你每有 $1，+2 筹码', onHand: (x) => (x.run.money > 0 ? { chips: 2 * x.run.money } : null) },
+    { id: 'gold', name: '金小丑', cost: 6, rarity: 1, desc: '每关结束 +$4', endOfBlind: () => 4 },
+  ];
+  const JOKER_BY_ID = Object.fromEntries(JOKERS.map((j) => [j.id, j]));
+
+  const PLANETS = [
+    ['pluto', '冥王星', 'high_card'], ['mercury', '水星', 'pair'], ['uranus', '天王星', 'two_pair'], ['venus', '金星', 'three_kind'],
+    ['saturn', '土星', 'straight'], ['jupiter', '木星', 'flush'], ['earth', '地球', 'full_house'], ['mars', '火星', 'four_kind'], ['neptune', '海王星', 'straight_flush'],
+  ].map(([id, name, hand]) => ({ id, name, hand, cost: 3 }));
+
+  /* ───────────── blinds, bosses, the revolver ───────────── */
+  const CONFIG = {
+    antes: 8,
+    anteBase: [300, 1100, 2500, 5000, 9800, 18000, 31000, 52000],
+    blindMult: [1, 1.5, 2],
+    blindReward: [3, 4, 5],
+    hands: 4, discards: 3, handSize: 8, jokerSlots: 5, startMoney: 4,
+    interestPer: 5, interestCap: 5,
+    shopJokers: 2, shopPlanets: 2, rerollBase: 4,
+    chambers: 6,
+    devilKillMoney: 8,
+  };
+  const BOSSES = [
+    { id: 'wall', name: '高墙', desc: '目标分 ×2', targetMult: 2 },
+    { id: 'water', name: '深水', desc: '没有弃牌', discards: 0 },
+    { id: 'manacle', name: '镣铐', desc: '手牌上限 -1', handSize: -1 },
+    { id: 'flint', name: '燧石', desc: '牌型基础筹码和倍率减半', halve: true },
+    { id: 'club', name: '梅花之咒', desc: '梅花牌不计分', debuff: 'c' },
+    { id: 'heart', name: '红心之咒', desc: '红心牌不计分', debuff: 'h' },
+    { id: 'needle', name: '独针', desc: '只能出 1 手，但目标只有一半', hands: 1, targetMult: 0.5 },
+  ];
+  const BLIND_NAMES = ['小盲注', '大盲注', 'Boss'];
+
+  function blindTarget(ante, idx, boss) {
+    const base = CONFIG.anteBase[Math.min(ante, CONFIG.antes) - 1];
+    return Math.round(base * CONFIG.blindMult[idx] * (idx === 2 && boss && boss.targetMult ? boss.targetMult : 1));
+  }
+
+  function newRun(rng) {
+    return {
+      ante: 1, blind: 0, money: CONFIG.startMoney, jokers: [], levels: Object.fromEntries(HAND_ORDER.map((h) => [h, 1])),
+      plays: Object.fromEntries(HAND_ORDER.map((h) => [h, 0])), green: 0, planetsUsed: 0,
+      gun: { you: 0, devil: 0 }, // bullets loaded this ante
+      boss: BOSSES[Math.floor(rng() * BOSSES.length)], alive: true, devilsKilled: 0, log: [],
+    };
+  }
+
+  /* ───────────── scoring ───────────── */
+  // returns { type, name, chips, mult, total, steps } ; steps are for animation
+  function score(run, played, held, boss, fast, pre) {
+    const an = pre || analyze(played);
+    const { type, scoring } = an;
+    const lv = run.levels[type];
+    const h = HANDS[type];
+    let chips = h[1] + h[3] * (lv - 1), mult = h[2] + h[4] * (lv - 1);
+    if (boss && boss.halve) { chips = Math.ceil(chips / 2); mult = Math.ceil(mult / 2); }
+    const steps = fast ? null : [{ kind: 'base', chips, mult }];
+    const ctx = { run, played, held, type, scoring, has: an.has };
+    const apply = (kind, ref, e) => {
+      if (!e) return;
+      if (e.chips) chips += e.chips;
+      if (e.mult) mult += e.mult;
+      if (e.xmult) mult *= e.xmult;
+      if (steps) steps.push({ kind, ref, e, chips, mult });
+    };
+    for (const c of scoring) {
+      if (boss && boss.debuff === c.s) { if (steps) steps.push({ kind: 'debuff', ref: c, chips, mult }); continue; }
+      apply('card', c, { chips: cardChips(c) });
+      for (const j of run.jokers) { const d = JOKER_BY_ID[j]; if (d.onCard) apply('joker', j, d.onCard(c, ctx)); }
+    }
+    for (const j of run.jokers) { const d = JOKER_BY_ID[j]; if (d.onHand) apply('joker', j, d.onHand(ctx)); }
+    mult = Math.round(mult * 100) / 100;
+    return { type, name: h[0], chips, mult, total: Math.floor(chips * mult), steps, scoring };
+  }
+  // after a hand is played (mutates run counters)
+  function notePlayed(run, type) { run.plays[type]++; run.green++; }
+  function noteDiscard(run) { run.green = Math.max(0, run.green - 1); }
+
+  /* ───────────── blind lifecycle ───────────── */
+  function startBlind(run, rng) {
+    const idx = run.blind, boss = idx === 2 ? run.boss : null;
+    return {
+      idx, boss, target: blindTarget(run.ante, idx, boss), score: 0,
+      hands: boss && boss.hands ? boss.hands : CONFIG.hands,
+      discards: boss && boss.discards === 0 ? 0 : CONFIG.discards,
+      handSize: CONFIG.handSize + (boss && boss.handSize ? boss.handSize : 0),
+      deck: shuffle(makeDeck(), rng), hand: [],
+    };
+  }
+  function draw(b) { while (b.hand.length < b.handSize && b.deck.length) b.hand.push(b.deck.pop()); }
+
+  // the winner of each blind loads one of their own bullets; the boss winner loads, then fires
+  function loadBullet(run, youWon) { if (youWon) run.gun.you++; else run.gun.devil++; }
+  function hitChance(n) { return Math.min(1, n / CONFIG.chambers); }
+  function bossShot(run, youWon, rng) {
+    const shooter = youWon ? 'you' : 'devil';
+    const p = hitChance(run.gun[shooter]);
+    const hit = rng() < p;
+    return { shooter, p, hit, bullets: { ...run.gun } };
+  }
+
+  function endBlindMoney(run, b, won) {
+    const lines = [];
+    if (won) {
+      lines.push(['击败' + BLIND_NAMES[b.idx], CONFIG.blindReward[b.idx]]);
+      if (b.hands > 0) lines.push(['剩余出牌 ×' + b.hands, b.hands]);
+    }
+    const interest = Math.min(CONFIG.interestCap, Math.floor(run.money / CONFIG.interestPer));
+    if (interest) lines.push(['利息', interest]);
+    for (const j of run.jokers) { const d = JOKER_BY_ID[j]; if (d.endOfBlind) lines.push([d.name, d.endOfBlind()]); }
+    const total = lines.reduce((s, l) => s + l[1], 0);
+    run.money += total;
+    return { lines, total };
+  }
+  function advance(run, rng) {
+    run.blind++;
+    if (run.blind > 2) { run.blind = 0; run.ante++; run.gun = { you: 0, devil: 0 }; run.boss = BOSSES[Math.floor(rng() * BOSSES.length)]; }
+    return run.ante > CONFIG.antes ? 'victory' : 'next';
+  }
+
+  /* ───────────── shop ───────────── */
+  function rollShop(run, rng) {
+    const owned = new Set(run.jokers);
+    const pool = JOKERS.filter((j) => !owned.has(j.id));
+    const weight = (j) => (j.rarity === 1 ? 10 : j.rarity === 2 ? 4 : 1.2);
+    const items = [];
+    for (let i = 0; i < CONFIG.shopJokers && pool.length; i++) {
+      let tot = pool.reduce((s, j) => s + weight(j), 0), x = rng() * tot, k = 0;
+      while ((x -= weight(pool[k])) > 0) k++;
+      items.push({ kind: 'joker', id: pool[k].id, cost: pool[k].cost });
+      pool.splice(k, 1);
+    }
+    const pl = shuffle(PLANETS.slice(), rng);
+    for (let i = 0; i < CONFIG.shopPlanets; i++) items.push({ kind: 'planet', id: pl[i].id, hand: pl[i].hand, cost: pl[i].cost });
+    return items;
+  }
+  function devilDrop(run, rng) {
+    // killing the devil: pick 1 of 3 jokers, weighted toward rare
+    const owned = new Set(run.jokers);
+    const pool = shuffle(JOKERS.filter((j) => !owned.has(j.id)), rng).sort((a, b) => b.rarity - a.rarity + (rng() - 0.5) * 2);
+    return pool.slice(0, 3).map((j) => j.id);
+  }
+  function buy(run, item) {
+    if (run.money < item.cost) return false;
+    if (item.kind === 'joker') { if (run.jokers.length >= CONFIG.jokerSlots) return false; run.jokers.push(item.id); }
+    else { run.levels[item.hand]++; run.planetsUsed++; }
+    run.money -= item.cost;
+    return true;
+  }
+  function sellValue(id) { return Math.max(1, Math.floor(JOKER_BY_ID[id].cost / 2)); }
+
+  const DL = {
+    SUITS, SUIT_SYM, SUIT_NAME, rankLabel, cardChips, isFace, makeDeck, shuffle, HANDS, HAND_ORDER, evaluate, analyze, contains,
+    JOKERS, JOKER_BY_ID, PLANETS, CONFIG, BOSSES, BLIND_NAMES, blindTarget, newRun, score, notePlayed, noteDiscard,
+    startBlind, draw, loadBullet, hitChance, bossShot, endBlindMoney, advance, rollShop, devilDrop, buy, sellValue,
+  };
+  if (typeof module !== 'undefined' && module.exports) module.exports = DL; else root.DL = DL;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function () {
+  'use strict';
+  const DL = window.DL, CFG = DL.CONFIG;
+  const $ = (id) => document.getElementById(id);
+  let SPEED = 1;
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms * SPEED));
+  const REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const rng = Math.random;
+  const fmt = (n) => Math.floor(n).toLocaleString('en-US');
+  const isRed = (s) => s === 'h' || s === 'd';
+  const FACE = {
+    joker: '丑', greedy: '♦', lusty: '♥', wrath: '♠', glutton: '♣', jolly: '对', zany: '三', mad: '两', crazy: '顺', droll: '花', sly: '对',
+    duo: '×2', trio: '×3', family: '×2', fib: 'φ', scary: '鬼', even: '偶', odd: '奇', abstract: '抽', half: '½', green: '绿', nova: '✶',
+    constel: '座', banana: '蕉', bull: '牛', gold: '$',
+  };
+
+  /* ═════════ audio (starts on first tap) ═════════ */
+  let ac = null;
+  const A = () => { try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume(); } catch (e) { ac = null; } return ac; };
+  function noise(dur, vol, freq, type = 'lowpass', delay = 0) {
+    const a = A(); if (!a) return;
+    const t = a.currentTime + delay, b = a.createBuffer(1, Math.ceil(a.sampleRate * dur), a.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2.2);
+    const s = a.createBufferSource(); s.buffer = b;
+    const f = a.createBiquadFilter(); f.type = type; f.frequency.value = freq;
+    const g = a.createGain(); g.gain.value = vol;
+    s.connect(f).connect(g).connect(a.destination); s.start(t);
+  }
+  function tone(freq, dur, vol = 0.2, type = 'square', slide = 1, delay = 0) {
+    const a = A(); if (!a) return;
+    const t = a.currentTime + delay, o = a.createOscillator(), g = a.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, freq * slide), t + dur);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + 0.02);
+  }
+  const SFX = {
+    card() { noise(0.07, 0.3, 3200, 'highpass'); },
+    pick() { tone(880, 0.05, 0.08, 'square'); },
+    chip(i) { tone(420 * Math.pow(2, Math.min(i, 18) / 12), 0.09, 0.13, 'square'); },
+    mult(i) { tone(300 * Math.pow(2, Math.min(i, 18) / 12), 0.12, 0.13, 'sawtooth', 1.4); },
+    xmult() { tone(200, 0.25, 0.2, 'sawtooth', 3); noise(0.2, 0.3, 900); },
+    total(big) { noise(big ? 0.9 : 0.4, big ? 0.6 : 0.3, 700); tone(110, 0.5, 0.4, 'sine', 0.5); },
+    coins(n) { for (let i = 0; i < Math.min(n, 20); i++) tone(rand(1800, 2900), 0.08, 0.05, 'triangle', 1, i * 0.035 + rand(0, 0.03)); },
+    bang() { noise(0.6, 1.2, 1800); tone(70, 0.5, 0.9, 'sine', 0.4); noise(1.4, 0.3, 380, 'lowpass', 0.05); },
+    click() { tone(1800, 0.03, 0.25, 'square'); tone(900, 0.04, 0.2, 'square', 1, 0.05); },
+    spin() { for (let i = 0; i < 9; i++) tone(2400 - i * 100, 0.02, 0.08, 'square', 1, i * 0.05); },
+    load() { tone(300, 0.06, 0.25, 'square'); noise(0.05, 0.3, 2000, 'bandpass', 0.06); tone(180, 0.08, 0.3, 'square', 1, 0.1); },
+    heart() { tone(55, 0.12, 0.6, 'sine', 0.7); tone(50, 0.12, 0.5, 'sine', 0.7, 0.22); },
+    laugh() { for (let i = 0; i < 6; i++) tone(170 - i * 12, 0.12, 0.12, 'sawtooth', 0.8, i * 0.13); },
+    win() { [0, 4, 7, 12].forEach((s, i) => tone(330 * Math.pow(2, s / 12), 0.25, 0.13, 'square', 1, i * 0.1)); },
+    lose() { [0, -3, -7].forEach((s, i) => tone(220 * Math.pow(2, s / 12), 0.35, 0.13, 'square', 1, i * 0.18)); },
+    buy() { tone(1200, 0.06, 0.12, 'square'); tone(1600, 0.08, 0.12, 'square', 1, 0.06); },
+    drone() { tone(48, 2.5, 0.25, 'sawtooth', 0.9); },
+  };
+
+  /* ═════════ three.js · PS1 pipeline ═════════ */
+  const canvas = $('gl');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
+  renderer.setPixelRatio(1);
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color('#050403');
+  scene.fog = new THREE.Fog('#050403', 2.4, 6);
+  const camera = new THREE.PerspectiveCamera(52, 1, 0.05, 30);
+  const CAM_HOME = { pos: new THREE.Vector3(0, 1.42, 1.22), look: new THREE.Vector3(0, 0.96, -0.55) };
+  let portrait = false;
+  const cam = { pos: CAM_HOME.pos.clone(), look: CAM_HOME.look.clone(), tpos: CAM_HOME.pos.clone(), tlook: CAM_HOME.look.clone(), roll: 0, troll: 0, speed: 3.5 };
+  let shake = 0;
+  const camHome = () => { cam.tpos.copy(CAM_HOME.pos); cam.tlook.copy(CAM_HOME.look); cam.troll = 0; cam.speed = 3.5; };
+
+  const snapU = { value: new THREE.Vector2(160, 120) };
+  function psx(mat) {
+    mat.onBeforeCompile = (sh) => {
+      sh.uniforms.uSnap = snapU;
+      sh.vertexShader = 'uniform vec2 uSnap;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n  vec4 sp = gl_Position; sp.xy = floor(sp.xy / sp.w * uSnap + 0.5) / uSnap * sp.w; gl_Position = sp;');
+    };
+    return mat;
+  }
+  const lam = (o) => psx(new THREE.MeshLambertMaterial(o));
+  function ctex(w, h, draw) {
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    draw(c.getContext('2d'), w, h);
+    const t = new THREE.CanvasTexture(c);
+    t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.generateMipmaps = false;
+    return t;
+  }
+
+  let rt = null;
+  const post = new THREE.ShaderMaterial({
+    uniforms: { tDiffuse: { value: null }, res: { value: new THREE.Vector2(320, 240) }, time: { value: 0 }, red: { value: 0 } },
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+    fragmentShader: `
+      uniform sampler2D tDiffuse; uniform vec2 res; uniform float time; uniform float red; varying vec2 vUv;
+      float b2(vec2 a){ a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }
+      float b4(vec2 a){ return b2(0.5 * a) * 0.25 + b2(a); }
+      void main(){
+        vec2 px = floor(vUv * res);
+        vec3 c = texture2D(tDiffuse, (px + 0.5) / res).rgb;
+        c += (b4(px) - 0.5) / 22.0;
+        c = floor(c * 31.0 + 0.5) / 31.0;
+        float vig = smoothstep(1.2, 0.35, length(vUv - 0.5) * 1.5);
+        c *= 0.5 + 0.5 * vig;
+        c *= 0.93 + 0.07 * mod(px.y, 2.0);
+        c = mix(c, vec3(dot(c, vec3(0.5, 0.3, 0.2)) * 1.4, 0.0, 0.0), red);
+        gl_FragColor = vec4(c, 1.0);
+      }`,
+    depthTest: false, depthWrite: false,
+  });
+  const postScene = new THREE.Scene();
+  const postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), post));
+
+  function resize() {
+    const w = innerWidth, h = innerHeight;
+    renderer.setSize(w, h, false);
+    const lowH = w / h < 0.9 ? 420 : 300, lowW = Math.round(lowH * (w / h));
+    if (rt) rt.dispose();
+    rt = new THREE.WebGLRenderTarget(lowW, lowH, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+    post.uniforms.tDiffuse.value = rt.texture;
+    post.uniforms.res.value.set(lowW, lowH);
+    snapU.value.set(lowW / 2, lowH / 2);
+    camera.aspect = w / h;
+    portrait = w / h < 0.9;
+    camera.fov = portrait ? 78 : 52;
+    CAM_HOME.pos.set(0, portrait ? 1.6 : 1.42, portrait ? 1.42 : 1.22);
+    CAM_HOME.look.set(0, portrait ? 0.92 : 0.96, -0.55);
+    camera.updateProjectionMatrix();
+    if (G.phase !== 'shot') camHome();
+    layoutHand(); layoutPlayed();
+  }
+
+  /* ═════════ the room ═════════ */
+  scene.add(new THREE.AmbientLight(0x3a3040, 0.6));
+  const lamp = new THREE.SpotLight(0xffd9a0, 2.0, 6, 0.8, 0.6, 1.4);
+  lamp.position.set(0, 2.35, -0.3); lamp.target.position.set(0, 0.78, -0.25); scene.add(lamp, lamp.target);
+  const fill = new THREE.PointLight(0x7a2a1a, 0.55, 3); fill.position.set(0, 1.0, 0.9); scene.add(fill);
+  const candleL = new THREE.PointLight(0xff8a30, 0.7, 1.6); candleL.position.set(-0.95, 1.0, -0.75); scene.add(candleL);
+
+  const feltTex = ctex(64, 64, (g, w, h) => { g.fillStyle = '#1b3a26'; g.fillRect(0, 0, w, h); for (let i = 0; i < 520; i++) { g.fillStyle = Math.random() < 0.5 ? '#163020' : '#22452e'; g.fillRect(Math.random() * w | 0, Math.random() * h | 0, 1, 1); } });
+  feltTex.wrapS = feltTex.wrapT = THREE.RepeatWrapping; feltTex.repeat.set(4, 4);
+  const woodTex = ctex(32, 32, (g, w, h) => { g.fillStyle = '#3a2214'; g.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 3) { g.fillStyle = y % 6 ? '#2e1a0f' : '#4a2c19'; g.fillRect(0, y, w, 1); } });
+  const brickTex = ctex(64, 64, (g, w, h) => { g.fillStyle = '#1a0f0c'; g.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 8) for (let x = ((y / 8) % 2) * 8; x < w; x += 16) { g.fillStyle = ['#2a1712', '#24140f', '#301a14'][(x + y) % 3]; g.fillRect(x + 1, y + 1, 14, 6); } });
+  brickTex.wrapS = brickTex.wrapT = THREE.RepeatWrapping; brickTex.repeat.set(6, 3);
+  // pentagram painted on the felt
+  const sigilTex = ctex(64, 64, (g, w, h) => {
+    g.strokeStyle = 'rgba(190,40,30,0.55)'; g.lineWidth = 2; g.beginPath(); g.arc(32, 32, 28, 0, Math.PI * 2); g.stroke();
+    g.beginPath(); for (let i = 0; i <= 5; i++) { const a = -Math.PI / 2 + i * Math.PI * 4 / 5; g[i ? 'lineTo' : 'moveTo'](32 + Math.cos(a) * 27, 32 + Math.sin(a) * 27); } g.stroke();
+  });
+
+  const tableTop = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.06, 2.2), [lam({ map: woodTex }), lam({ map: woodTex }), lam({ map: feltTex }), lam({ map: woodTex }), lam({ map: woodTex }), lam({ map: woodTex })]);
+  tableTop.position.set(0, 0.75, -0.35); scene.add(tableTop);
+  const rim = new THREE.Mesh(new THREE.BoxGeometry(2.72, 0.08, 2.32), lam({ map: woodTex })); rim.position.set(0, 0.72, -0.35); scene.add(rim);
+  const sigil = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), lam({ map: sigilTex, transparent: true, depthWrite: false })); sigil.rotation.x = -Math.PI / 2; sigil.position.set(0, 0.7815, -0.3); scene.add(sigil);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), lam({ color: 0x120c0a })); floor.rotation.x = -Math.PI / 2; scene.add(floor);
+  const room = new THREE.Mesh(new THREE.BoxGeometry(8, 4.5, 8), lam({ map: brickTex, side: THREE.BackSide })); room.position.set(0, 2.2, -1); scene.add(room);
+  const shade = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.2, 8, 1, true), lam({ color: 0x2a3a2a, side: THREE.DoubleSide })); shade.position.set(0, 2.25, -0.3); scene.add(shade);
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 4), new THREE.MeshBasicMaterial({ color: 0xffe8b0 })); bulb.position.set(0, 2.17, -0.3); scene.add(bulb);
+  const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 1.3, 4), lam({ color: 0x111111 })); cord.position.set(0, 3.0, -0.3); scene.add(cord);
+  // candles on the devil's side
+  const flames = [];
+  for (const [x, z, hgt] of [[-0.95, -0.85, 0.16], [-0.83, -0.95, 0.1], [0.98, -0.9, 0.13]]) {
+    const wax = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.028, hgt, 6), lam({ color: 0xd8ccb0 })); wax.position.set(x, 0.78 + hgt / 2, z); scene.add(wax);
+    const fl = new THREE.Mesh(new THREE.ConeGeometry(0.012, 0.04, 4), new THREE.MeshBasicMaterial({ color: 0xffb040 })); fl.position.set(x, 0.8 + hgt + 0.01, z); scene.add(fl); flames.push(fl);
+  }
+  // dust motes in the lamp light
+  const dustGeo = new THREE.BufferGeometry(), DUST = 70, dustPos = new Float32Array(DUST * 3);
+  for (let i = 0; i < DUST; i++) { dustPos[i * 3] = rand(-0.8, 0.8); dustPos[i * 3 + 1] = rand(0.85, 2.1); dustPos[i * 3 + 2] = rand(-1.1, 0.4); }
+  dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+  scene.add(new THREE.Points(dustGeo, new THREE.PointsMaterial({ color: 0xffe2a8, size: 0.008, transparent: true, opacity: 0.6 })));
+
+  /* ═════════ the devil ═════════ */
+  const devil = new THREE.Group(); devil.position.set(0, 0, -1.5); scene.add(devil);
+  const skin = lam({ color: 0x8c2a1c }), coat = lam({ color: 0x3a1010 }), bone = lam({ color: 0xd8ccb0 });
+  const body = new THREE.Group(); devil.add(body); // pivots at the chair for falling back
+  body.position.y = 0.7;
+  const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.42, 0.8, 7), coat); torso.position.y = 0.38; body.add(torso);
+  const head = new THREE.Group(); head.position.set(0, 0.92, 0); body.add(head);
+  head.add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.21, 0), skin));
+  const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.06, 0.12), skin); jaw.position.set(0, -0.13, 0.08); head.add(jaw);
+  const grin = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.025, 0.02), new THREE.MeshBasicMaterial({ color: 0x120404 })); grin.position.set(0, -0.08, 0.19); head.add(grin);
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffd23a });
+  const arms = [];
+  for (const sx of [-1, 1]) {
+    const horn = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.26, 5), bone); horn.position.set(sx * 0.13, 0.2, -0.02); horn.rotation.z = -sx * 0.45; head.add(horn);
+    const eye = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.025, 0.02), eyeMat); eye.position.set(sx * 0.075, 0.02, 0.19); head.add(eye);
+    const arm = new THREE.Group(); arm.position.set(sx * 0.36, 0.62, 0.05); body.add(arm); arms.push(arm);
+    const up = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.62, 5), coat); up.position.set(0, -0.12, 0.24); up.rotation.x = 1.05; arm.add(up);
+    const hand = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.05, 0.14), skin); hand.position.set(sx * 0.03, -0.27, 0.48); arm.add(hand);
+    arm.rotation.z = sx * 0.12;
+  }
+  const eyeLight = new THREE.PointLight(0xff5020, 0.6, 1.6); eyeLight.position.set(0, 1.64, -1.25); scene.add(eyeLight);
+  const dv = { lean: 0, tlean: 0, nod: 0, laugh: 0, fall: 0, tfall: 0, flinch: 0 };
+
+  // coins on his coat: how many are left tracks how far you are from the target
+  const COINS = 90;
+  const coinGeo = new THREE.CylinderGeometry(0.028, 0.028, 0.008, 7);
+  const coinMat = lam({ color: 0xe8b33a, emissive: 0x3a2400 });
+  const coinIM = new THREE.InstancedMesh(coinGeo, coinMat, COINS);
+  const m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), one = new THREE.Vector3(1, 1, 1);
+  for (let i = 0; i < COINS; i++) {
+    const y = rand(0.06, 0.72), a = rand(-1.25, 1.25), r = 0.3 + (0.72 - y) * 0.16 + 0.012;
+    qq.setFromEuler(new THREE.Euler(Math.PI / 2, 0, -a)); m4.compose(new THREE.Vector3(Math.sin(a) * r, y, Math.cos(a) * r), qq, one); coinIM.setMatrixAt(i, m4);
+  }
+  body.add(coinIM);
+  let coinShown = COINS, coinWant = COINS;
+
+  const flyers = [];
+  function burstCoins(n, from) {
+    for (let i = 0; i < n; i++) {
+      const m = new THREE.Mesh(coinGeo, coinMat);
+      m.position.copy(from || new THREE.Vector3(rand(-0.25, 0.25), rand(0.9, 1.3), -1.25));
+      scene.add(m);
+      flyers.push({ m, v: new THREE.Vector3(rand(-0.9, 0.9), rand(1.0, 2.2), rand(0.6, 1.7)), spin: new THREE.Vector3(rand(-12, 12), rand(-12, 12), 0), rest: false });
+    }
+    while (flyers.length > 140) { const f = flyers.shift(); scene.remove(f.m); }
+  }
+  function clearFlyers() { flyers.forEach((f) => scene.remove(f.m)); flyers.length = 0; }
+
+  /* ═════════ the revolver ═════════ */
+  const gun = new THREE.Group(); scene.add(gun); gun.scale.setScalar(1.5);
+  const steel = lam({ color: 0x6b7078 }), dark = lam({ color: 0x24262a }), grip = lam({ map: woodTex });
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.018, 0.24, 6), steel); barrel.rotation.x = Math.PI / 2; barrel.position.set(0, 0.012, -0.15); gun.add(barrel);
+  const gunFrame = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.022, 0.05), dark); gunFrame.position.set(0, 0.034, 0.05); gun.add(gunFrame);
+  const drum = new THREE.Group(); drum.position.set(0, 0, -0.01); gun.add(drum);
+  const drumBody = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.042, 0.07, 6), steel); drumBody.rotation.x = Math.PI / 2; drum.add(drumBody);
+  const holeMats = [];
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2, mat = new THREE.MeshBasicMaterial({ color: 0x0a0a0a });
+    const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 0.072, 5), mat);
+    hole.rotation.x = Math.PI / 2; hole.position.set(Math.cos(a) * 0.026, Math.sin(a) * 0.026, 0.001); drum.add(hole); holeMats.push(mat);
+  }
+  const handle = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.11, 0.05), grip); handle.position.set(0, -0.07, 0.07); handle.rotation.x = -0.45; gun.add(handle);
+  const hammer = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.03, 0.02), dark); hammer.position.set(0, 0.04, 0.05); gun.add(hammer);
+  const flashLight = new THREE.PointLight(0xffc060, 0, 3); scene.add(flashLight);
+  const muzzle = new THREE.Mesh(new THREE.OctahedronGeometry(0.06, 0), new THREE.MeshBasicMaterial({ color: 0xffe080 })); muzzle.visible = false; gun.add(muzzle); muzzle.position.set(0, 0.012, -0.3);
+  const GUN_POSES = {
+    rest: { p: new THREE.Vector3(0.62, 0.81, -0.42), r: new THREE.Euler(0, 0.9, Math.PI / 2) },
+    show: { p: new THREE.Vector3(0.22, 1.0, -0.15), r: new THREE.Euler(-0.4, -0.25, 0) },
+    mine: { p: new THREE.Vector3(0.12, 1.1, 0.55), r: new THREE.Euler(0.16, 0.06, 0) },
+    his: { p: new THREE.Vector3(0.05, 1.22, -0.95), r: new THREE.Euler(-0.12, Math.PI, 0) },
+  };
+  gun.position.copy(GUN_POSES.rest.p); gun.rotation.copy(GUN_POSES.rest.r);
+  const bulletGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.05, 6);
+  const bulletMat = { you: new THREE.MeshBasicMaterial({ color: 0xffc23d }), devil: new THREE.MeshBasicMaterial({ color: 0xe0362a }) };
+  const casings = [];
+
+  /* ═════════ cards ═════════ */
+  const CW = 0.118, CH = 0.166;
+  const cardGeo = new THREE.PlaneGeometry(CW, CH);
+  const texCache = new Map();
+  function faceTex(c) {
+    const key = c.r + c.s;
+    if (texCache.has(key)) return texCache.get(key);
+    const t = ctex(56, 78, (g, w, h) => {
+      g.fillStyle = '#f0e6d0'; g.fillRect(0, 0, w, h);
+      g.fillStyle = '#c4b393'; g.fillRect(0, h - 2, w, 2); g.fillRect(w - 2, 0, 2, h);
+      const col = isRed(c.s) ? '#c02a1e' : '#1b1512';
+      g.fillStyle = col; g.textBaseline = 'top'; g.textAlign = 'left';
+      g.font = 'bold 24px monospace'; g.fillText(DL.rankLabel(c.r), 3, 2);
+      g.font = '16px sans-serif'; g.fillText(DL.SUIT_SYM[c.s] + '︎', 4, 26);
+      g.textAlign = 'center';
+      if (DL.isFace(c) || c.r === 14) {
+        g.fillStyle = isRed(c.s) ? '#e8c2a8' : '#cfc3ae'; g.fillRect(18, 30, 32, 42);
+        g.fillStyle = col; g.font = 'bold 28px serif'; g.fillText(DL.rankLabel(c.r), 34, 36);
+      } else { g.font = '34px sans-serif'; g.fillText(DL.SUIT_SYM[c.s] + '︎', w / 2 + 6, 34); }
+    });
+    texCache.set(key, t);
+    return t;
+  }
+  const backTex = ctex(56, 78, (g, w, h) => { g.fillStyle = '#3a0e0c'; g.fillRect(0, 0, w, h); g.fillStyle = '#5a1612'; for (let y = 0; y < h; y += 6) for (let x = (y / 6) % 2 * 3; x < w; x += 6) g.fillRect(x, y, 3, 3); g.strokeStyle = '#e8b33a'; g.strokeRect(3, 3, w - 6, h - 6); g.fillStyle = '#e8b33a'; g.fillRect(w / 2 - 4, h / 2 - 4, 8, 8); });
+  const backMat = lam({ map: backTex });
+  class Card3D {
+    constructor(c) {
+      this.c = c;
+      this.root = new THREE.Group();
+      this.flip = new THREE.Group(); this.root.add(this.flip);
+      this.front = new THREE.Mesh(cardGeo, lam({ map: faceTex(c) }));
+      this.back = new THREE.Mesh(cardGeo, backMat); this.back.rotation.y = Math.PI;
+      this.front.userData.card = this; this.back.userData.card = this;
+      this.flip.add(this.front, this.back);
+      this.tp = new THREE.Vector3(); this.tr = new THREE.Euler(); this.tf = 0; this.fv = Math.PI; this.speed = 11;
+      this.jump = 0; this.wob = Math.random() * 6;
+      scene.add(this.root);
+    }
+    place(p, r, faceUp = true, snap = false) {
+      this.tp.copy(p); this.tr.copy(r); this.tf = faceUp ? 0 : Math.PI;
+      if (snap) { this.root.position.copy(p); this.root.rotation.copy(r); this.fv = this.tf; }
+    }
+    update(dt, t) {
+      const k = 1 - Math.exp(-this.speed * dt);
+      this.root.position.lerp(this.tp, k);
+      this.root.rotation.x += (this.tr.x - this.root.rotation.x) * k;
+      this.root.rotation.y += (this.tr.y - this.root.rotation.y) * k;
+      this.root.rotation.z += (this.tr.z - this.root.rotation.z) * k;
+      this.fv += (this.tf - this.fv) * (1 - Math.exp(-10 * dt));
+      this.flip.rotation.y = this.fv;
+      this.jump = Math.max(0, this.jump - dt * 3.2);
+      const j = Math.sin(this.jump * Math.PI);
+      this.flip.position.z = j * 0.05;
+      this.flip.scale.setScalar(1 + j * 0.25);
+      this.flip.rotation.z = j * 0.15 * Math.sin(this.wob);
+    }
+    dispose() { scene.remove(this.root); this.front.material.dispose(); }
+  }
+  const cards3d = new Map();
+  const C3 = (c) => { if (!cards3d.has(c.id)) cards3d.set(c.id, new Card3D(c)); return cards3d.get(c.id); };
+  function trash(c, dir = 1) { const o = cards3d.get(c.id); if (!o) return; cards3d.delete(c.id); o.speed = 7; o.place(new THREE.Vector3(1.5 * dir, 0.95, 0.0), new THREE.Euler(-1.2, 0, 1.4 * dir), false); setTimeout(() => o.dispose(), 700); }
+
+  /* ═════════ game state ═════════ */
+  const G = { pending: null, phase: 'title', run: null, b: null, sel: new Set(), sortBy: 'rank', busy: false, played: [], hover: null, stats: null, rerolls: 0, shop: [], hints: new Set(), chamberOrder: [] };
+  const DECK_POS = new THREE.Vector3(0.95, 0.95, 0.15), DECK_ROT = new THREE.Euler(-1.2, 0, 0.4);
+  const handNow = () => (G.b ? G.b.hand : []);
+
+  function sortHand() {
+    const h = handNow();
+    if (G.sortBy === 'rank') h.sort((a, b) => b.r - a.r || a.s.localeCompare(b.s));
+    else h.sort((a, b) => a.s.localeCompare(b.s) || b.r - a.r);
+  }
+  function layoutHand() {
+    const h = handNow(), n = h.length;
+    if (!n) return;
+    const sp = Math.min(portrait ? 0.074 : 0.112, (portrait ? 0.56 : 0.95) / Math.max(n, 1));
+    const z = portrait ? 0.62 : 0.27;
+    h.forEach((c, i) => {
+      if (G.pending && G.pending.has(c.id)) { C3(c).place(DECK_POS, DECK_ROT, false); return; }
+      const o = C3(c), off = i - (n - 1) / 2, up = G.sel.has(c), hv = G.hover === c && !up;
+      o.place(new THREE.Vector3(off * sp, 0.82 + i * 0.0012 + (up ? 0.035 : hv ? 0.012 : 0) - Math.abs(off) * 0.004, z - (up ? 0.07 : hv ? 0.02 : 0) + Math.abs(off) * 0.01), new THREE.Euler(-0.92, 0, -off * 0.04));
+    });
+  }
+  function layoutPlayed() {
+    const n = G.played.length;
+    G.played.forEach((c, i) => {
+      C3(c).place(new THREE.Vector3((i - (n - 1) / 2) * (CW + (portrait ? 0.004 : 0.02)), 0.8 + i * 0.001, portrait ? 0.12 : -0.16), new THREE.Euler(-1.2, 0, 0), true);
+    });
+  }
+
+  /* ═════════ HUD ═════════ */
+  function projectEl(world) {
+    const p = world.clone().project(camera);
+    return { x: (p.x * 0.5 + 0.5) * innerWidth, y: (-p.y * 0.5 + 0.5) * innerHeight };
+  }
+  function pop(x, y, text, cls = '') {
+    const el = document.createElement('div'); el.className = 'pop ' + cls; el.textContent = text;
+    el.style.left = `${x}px`; el.style.top = `${y}px`;
+    document.body.appendChild(el); setTimeout(() => el.remove(), 1100 * Math.max(SPEED, 0.2));
+  }
+  const popAt = (world, text, cls) => { const p = projectEl(world); pop(p.x, p.y, text, cls); };
+  function bump(el) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+  function flashEl(el, a = 1, ms = 250) { el.style.transition = 'none'; el.style.opacity = a; requestAnimationFrame(() => requestAnimationFrame(() => { el.style.transition = `opacity ${ms}ms steps(6)`; el.style.opacity = 0; })); }
+
+  function renderJokers(mode) {
+    const run = G.run, bar = $('jbar');
+    let html = '';
+    for (let i = 0; i < CFG.jokerSlots; i++) {
+      const id = run.jokers[i];
+      if (!id) { html += '<div class="jk empty"></div>'; continue; }
+      const d = DL.JOKER_BY_ID[id];
+      html += `<div class="jk r${d.rarity}" data-j="${id}" title="${d.desc}"><span>${d.name}</span><span class="face">${FACE[id] || '丑'}</span><span>${id === 'green' ? '+' + run.green : id === 'constel' && run.planetsUsed ? '×' + (1 + 0.1 * run.planetsUsed).toFixed(1) : ''}</span></div>`;
+    }
+    bar.innerHTML = html;
+  }
+  function jokerEl(id) { return $('jbar').querySelector(`[data-j="${id}"]`); }
+  function renderCyl() {
+    const cyl = $('cyl'), r = cyl.offsetWidth * 0.3, c = cyl.offsetWidth / 2;
+    cyl.innerHTML = Array.from({ length: 6 }, (_, i) => {
+      const a = -Math.PI / 2 + (i / 6) * Math.PI * 2, who = G.chamberOrder[i] || '';
+      return `<span class="${who}" style="left:${c + Math.cos(a) * r}px;top:${c + Math.sin(a) * r}px"></span>`;
+    }).join('');
+    const g = G.run.gun;
+    $('gunTxt').innerHTML = `<b>你 ${g.you} 发</b>　<em>恶魔 ${g.devil} 发</em>`;
+    const boss = G.run.blind === 2 && (G.phase === 'play' || G.phase === 'intro' || G.phase === 'score');
+    $('gunOdds').innerHTML = boss
+      ? `这关赢 → <b>你开枪 ${g.you + 1}/6</b><br>这关输 → <em>恶魔开枪 ${g.devil + 1}/6</em>`
+      : `Boss 关后，赢家开枪<br>命中 = 自己的子弹 / 6`;
+  }
+  function hud() {
+    const run = G.run, b = G.b;
+    if (!run) return;
+    $('anteLbl').textContent = `底注 ${Math.min(run.ante, CFG.antes)} / ${CFG.antes} · 第 ${run.blind + 1} 关`;
+    const boss = run.blind === 2;
+    $('blindLbl').textContent = boss ? `Boss · ${run.boss.name}` : DL.BLIND_NAMES[run.blind];
+    $('blindLbl').className = boss ? 'boss' : '';
+    $('bossLbl').hidden = !boss; $('bossLbl').textContent = boss ? run.boss.desc : '';
+    if (b) {
+      $('targetLbl').textContent = fmt(b.target);
+      $('scoreNow').textContent = fmt(b.score);
+      $('scoreBar').style.width = `${Math.min(100, b.score / b.target * 100)}%`;
+      $('counts').innerHTML = `<i class="c">出牌 ${b.hands}</i>　<i class="m">弃牌 ${b.discards}</i>`;
+      $('deckLbl').textContent = `牌堆 ${b.deck.length}`;
+    }
+    $('money').textContent = `$${run.money}`;
+    renderCyl();
+    const can = G.phase === 'play' && !G.busy, n = G.sel.size;
+    $('playBtn').disabled = !can || n < 1 || n > 5 || !b || b.hands <= 0;
+    $('discBtn').disabled = !can || n < 1 || !b || b.discards <= 0;
+    $('sortBtn').textContent = G.sortBy === 'rank' ? '按点数' : '按花色';
+    preview();
+  }
+  function preview() {
+    if (G.phase !== 'play') return;
+    const sel = [...G.sel];
+    if (!sel.length) { $('calc').hidden = true; return; }
+    const held = handNow().filter((c) => !G.sel.has(c));
+    const s = DL.score(G.run, sel, held, G.b.idx === 2 ? G.b.boss : null);
+    $('calc').hidden = false; $('total').hidden = true;
+    $('handName').innerHTML = `${s.name}<small>Lv.${G.run.levels[s.type]}</small>`;
+    $('chipsV').textContent = fmt(s.steps[0].chips); $('multV').textContent = fmt(s.steps[0].mult);
+    const need = G.b.target - G.b.score;
+    $('est').innerHTML = `预计 <b>${fmt(s.total)}</b>${s.total >= need ? '　<b>· 够过关了</b>' : `　还差 ${fmt(need)}`}`;
+  }
+
+  let sayT = 0;
+  function say(text, ms = 2600) {
+    const el = $('say'); el.textContent = text ? `「${text}」` : ''; el.style.opacity = text ? 1 : 0;
+    clearTimeout(sayT); if (text) sayT = setTimeout(() => (el.style.opacity = 0), ms * Math.max(SPEED, 0.3));
+    if (text) { dv.nod = 1; tone(140 + Math.random() * 30, 0.08, 0.05, 'sawtooth'); }
+  }
+  function banner(big, sm = '', color = '') {
+    const el = $('banner');
+    if (!big) { el.hidden = true; return; }
+    $('bnBig').innerHTML = big; $('bnBig').style.color = color; $('bnSm').innerHTML = sm;
+    el.hidden = false; el.classList.remove('in'); void el.offsetWidth; el.classList.add('in');
+  }
+  function hint(key, html) {
+    if (G.hints.has(key) || SPEED < 0.5) return Promise.resolve();
+    G.hints.add(key);
+    $('hintTxt').innerHTML = html; $('hint').hidden = false;
+    return new Promise((res) => { $('hintOk').onclick = () => { $('hint').hidden = true; res(); }; });
+  }
+  const hideHint = () => { $('hint').hidden = true; };
+
+  const LINES = {
+    intro: ['坐下吧。牌已经洗好了。', '又一个想赢钱的人。', '我们来玩点刺激的。'],
+    boss: ['现在，来点真的。', 'Boss 关。枪就在桌上。', '这一关的赢家，可以扣扳机。'],
+    big: ['……你哪来的这手牌？', '嘶——', '别得意。', '我的金币！'],
+    small: ['就这？', '呵。', '再来啊。'],
+    youWin: ['算你走运。', '这发子弹归你。', '……装吧。'],
+    devilWin: ['我的子弹，我收下了。', '哈。这一格是我的。', '你离死又近了一格。'],
+    youAim: ['……你敢吗？', '开枪啊。', '看着我的眼睛。'],
+    devilAim: ['把头抬起来。', '别眨眼。', '轮到我了。'],
+    miss: ['咔。哈哈哈哈！', '空的？可惜啊。'],
+    spared: ['运气好而已。', '下一枪就没这么幸运了。'],
+    revive: ['我回来了。你以为能杀死我？', '……那只是一具身体。', '我们继续。'],
+  };
+  const pick = (k) => LINES[k][Math.floor(Math.random() * LINES[k].length)];
+
+  /* ═════════ tween helpers ═════════ */
+  function tween(ms, fn) {
+    return new Promise((res) => {
+      const dur = Math.max(1, (REDUCE ? ms * 0.3 : ms) * SPEED), t0 = performance.now();
+      const step = (now) => { const k = Math.min(1, (now - t0) / dur); fn(k); if (k < 1) requestAnimationFrame(step); else res(); };
+      if (SPEED < 0.05) { fn(1); res(); return; }
+      requestAnimationFrame(step);
+    });
+  }
+  const ease = (k) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
+  async function moveGun(to, ms) {
+    const from = { p: gun.position.clone(), r: gun.rotation.clone() }, T = GUN_POSES[to];
+    await tween(ms, (k) => {
+      const e = ease(k);
+      gun.position.lerpVectors(from.p, T.p, e);
+      gun.position.y += Math.sin(k * Math.PI) * 0.08;
+      gun.rotation.set(from.r.x + (T.r.x - from.r.x) * e, from.r.y + (T.r.y - from.r.y) * e, from.r.z + (T.r.z - from.r.z) * e);
+    });
+  }
+  // the cylinder swings out of the frame for loading, like a real revolver
+  function swing(out) { const x0 = drum.position.x, x1 = out ? -0.07 : 0; if (!out) SFX.click(); return tween(260, (k) => { drum.position.x = x0 + (x1 - x0) * ease(k); }); }
+  function setHoles() { holeMats.forEach((m, i) => m.color.set(G.chamberOrder[i] === 'you' ? 0xffc23d : G.chamberOrder[i] === 'devil' ? 0xe0362a : 0x0a0a0a)); }
+
+  /* ═════════ run flow ═════════ */
+  async function startRun() {
+    A();
+    G.run = DL.newRun(rng);
+    G.stats = { best: 0, bestName: '', hands: 0, kills: 0, won: 0, lost: 0, shots: [], finalWin: false };
+    G.chamberOrder = []; setHoles();
+    for (const o of cards3d.values()) o.dispose(); cards3d.clear();
+    clearFlyers(); casings.forEach((c) => scene.remove(c)); casings.length = 0;
+    dv.tfall = 0; eyeMat.color.set(0xffd23a); post.uniforms.red.value = 0; $('fade').style.opacity = 0; cam.troll = 0;
+    ['title', 'end', 'shop', 'pick'].forEach((id) => ($(id).hidden = true));
+    $('hud').hidden = false; $('hud').classList.remove('cine', 'away');
+    renderJokers(); resize();
+    say(pick('intro'));
+    await startBlind();
+  }
+
+  async function startBlind() {
+    const run = G.run;
+    G.b = DL.startBlind(run, rng);
+    G.sel.clear(); G.played = []; G.phase = 'intro'; G.busy = true;
+    coinWant = COINS;
+    $('calc').hidden = true;
+    hud();
+    const boss = G.b.idx === 2;
+    if (boss) {
+      SFX.drone();
+      cam.tpos.set(0, 1.25, 0.2); cam.tlook.set(0, 1.55, -1.5);
+      banner(`Boss · ${run.boss.name}`, `<em>${run.boss.desc}</em><br>目标 <b>${fmt(G.b.target)}</b>`, 'var(--blood)');
+      say(pick('boss'));
+    } else banner(DL.BLIND_NAMES[G.b.idx], `底注 ${run.ante} · 目标 <b>${fmt(G.b.target)}</b>`, '');
+    await wait(1500);
+    banner('');
+    camHome();
+    if (boss) await hint('boss', `<b>Boss 关</b>结束后会开枪。<br>右边的左轮：<b>这关赢</b>，你装弹后开枪；<em>这关输</em>，恶魔装弹后开枪。<br>命中率 = 开枪的人自己的子弹数 / 6。`);
+    await drawUp();
+    G.phase = 'play'; G.busy = false; hud();
+    if (run.ante === 1 && G.b.idx === 0) hint('play', `点手牌选 1–5 张，凑德州牌型（对子、两对、三条、顺子、同花……）。<br>分数 = <i class="c">筹码</i> × <i class="m">倍率</i>。累计到<b>目标分</b>就赢下这一关。`);
+  }
+
+  async function drawUp() {
+    const b = G.b, before = new Set(b.hand.map((c) => c.id));
+    DL.draw(b); sortHand();
+    const fresh = b.hand.filter((c) => !before.has(c.id));
+    G.pending = new Set(fresh.map((c) => c.id));
+    for (const c of fresh) C3(c).place(DECK_POS, DECK_ROT, false, true);
+    for (const c of fresh) { G.pending.delete(c.id); layoutHand(); SFX.card(); await wait(55); }
+    G.pending = null;
+    layoutHand(); hud();
+  }
+
+  async function discard() {
+    const b = G.b, sel = [...G.sel];
+    if (!sel.length || b.discards <= 0 || G.busy) return;
+    G.busy = true; hideHint();
+    b.discards--; DL.noteDiscard(G.run);
+    b.hand = b.hand.filter((c) => !G.sel.has(c)); G.sel.clear();
+    sel.forEach((c, i) => setTimeout(() => trash(c, 1), i * 50));
+    SFX.card(); $('calc').hidden = true; hud(); renderJokers();
+    await wait(300);
+    await drawUp();
+    G.busy = false; hud();
+  }
+
+  async function play() {
+    const run = G.run, b = G.b, sel = [...G.sel];
+    if (!sel.length || sel.length > 5 || b.hands <= 0 || G.busy) return;
+    G.busy = true; G.phase = 'score'; hideHint();
+    // keep the hand order for the played row
+    const played = b.hand.filter((c) => G.sel.has(c));
+    const held = b.hand.filter((c) => !G.sel.has(c));
+    const res = DL.score(run, played, held, b.idx === 2 ? b.boss : null);
+    b.hand = held; G.sel.clear(); G.played = played;
+    b.hands--;
+    hud(); layoutHand(); layoutPlayed(); SFX.card();
+    $('calc').hidden = false; $('total').hidden = true; $('est').textContent = '';
+    $('handName').innerHTML = `${res.name}<small>Lv.${run.levels[res.type]}</small>`;
+    await wait(420);
+    const scoringIds = new Set(res.scoring.map((c) => c.id));
+    for (const c of played) if (!scoringIds.has(c.id)) { const o = C3(c); o.tp.y -= 0.01; o.front.material.color.setRGB(0.55, 0.55, 0.55); }
+    let i = 0, prevChips = 0, prevMult = 0;
+    const chipsEl = $('chipsV'), multEl = $('multV');
+    for (const st of res.steps) {
+      const d = Math.max(110, 330 - i * 18);
+      if (st.kind === 'base') { chipsEl.textContent = fmt(st.chips); multEl.textContent = fmt(st.mult); bump(chipsEl); bump(multEl); SFX.chip(0); }
+      else if (st.kind === 'debuff') { const o = C3(st.ref); o.jump = 1; popAt(o.root.position.clone().add(new THREE.Vector3(0, 0.1, 0)), '无效', 'n'); SFX.click(); }
+      else if (st.kind === 'card') {
+        const o = C3(st.ref); o.jump = 1;
+        popAt(o.root.position.clone().add(new THREE.Vector3(0, 0.11, 0)), `+${st.e.chips}`, 'c');
+        chipsEl.textContent = fmt(st.chips); bump(chipsEl); SFX.chip(i);
+      } else if (st.kind === 'joker') {
+        const el = jokerEl(st.ref);
+        const txt = st.e.xmult ? `×${+st.e.xmult.toFixed(2)}` : st.e.mult ? `+${st.e.mult} 倍率` : `+${st.e.chips}`;
+        const cls = st.e.chips && !st.e.mult && !st.e.xmult ? 'c' : 'm';
+        if (el) { el.classList.remove('fire'); void el.offsetWidth; el.classList.add('fire'); const r = el.getBoundingClientRect(); pop(r.left + r.width / 2, r.bottom + 18, txt, cls); }
+        if (st.e.chips) { chipsEl.textContent = fmt(st.chips); bump(chipsEl); }
+        if (st.e.mult || st.e.xmult) { multEl.textContent = fmt(Math.round(st.mult * 100) / 100); bump(multEl); }
+        if (st.e.xmult) { SFX.xmult(); shake = Math.max(shake, 0.25); } else if (st.e.mult) SFX.mult(i); else SFX.chip(i);
+      }
+      prevChips = st.chips; prevMult = st.mult;
+      i++;
+      await wait(st.kind === 'base' ? 380 : d);
+    }
+    // final total
+    const total = res.total, need = b.target - b.score, frac = Math.min(1, total / b.target);
+    const tEl = $('total'); tEl.hidden = false; tEl.textContent = fmt(total); tEl.className = 'num' + (frac > 0.4 ? ' hot' : '');
+    void tEl.offsetWidth;
+    SFX.total(frac > 0.4); shake = Math.max(shake, 0.15 + frac * 0.5);
+    await wait(520);
+    // the devil bleeds gold as you close in on the target
+    const before = b.score;
+    b.score += total;
+    G.stats.hands++;
+    if (total > G.stats.best) { G.stats.best = total; G.stats.bestName = res.name; }
+    DL.notePlayed(run, res.type);
+    const lost = Math.round(COINS * (Math.min(b.score, b.target) - Math.min(before, b.target)) / b.target);
+    coinWant = Math.round(COINS * Math.max(0, 1 - b.score / b.target));
+    burstCoins(Math.min(45, Math.max(3, lost)), new THREE.Vector3(0, 1.15, -1.3)); SFX.coins(lost);
+    dv.flinch = Math.min(1, 0.3 + frac);
+    if (frac > 0.35) say(pick('big'), 1800); else if (frac < 0.12 && Math.random() < 0.5) say(pick('small'), 1500);
+    // roll the score counter
+    const sEl = $('scoreNow');
+    await tween(450, (k) => { sEl.textContent = fmt(before + total * k); $('scoreBar').style.width = `${Math.min(100, (before + total * k) / b.target * 100)}%`; });
+    bump(sEl);
+    renderJokers();
+    await wait(380);
+    $('calc').hidden = true;
+    played.forEach((c, k) => setTimeout(() => trash(c, 1), k * 45));
+    G.played = [];
+    await wait(260);
+    if (b.score >= b.target) return endBlind(true);
+    if (b.hands <= 0) return endBlind(false);
+    await drawUp();
+    G.phase = 'play'; G.busy = false; hud();
+  }
+
+  /* ─── end of a blind: load → (boss) shoot → cash out → shop ─── */
+  async function endBlind(won) {
+    const run = G.run, b = G.b;
+    G.phase = 'load'; G.busy = true; $('hud').classList.add('cine'); hud();
+    if (won) G.stats.won++; else G.stats.lost++;
+    if (run.ante === CFG.antes && b.idx === 2 && won) G.stats.finalWin = true;
+    // sweep remaining hand
+    b.hand.forEach((c, k) => setTimeout(() => trash(c, -1), k * 40));
+    if (won) { SFX.win(); banner('过关！', `${fmt(b.score)} / ${fmt(b.target)}`, 'var(--gold)'); say(pick('youWin')); }
+    else { SFX.lose(); banner('没打到', `${fmt(b.score)} / ${fmt(b.target)}　差 ${Math.round((1 - b.score / b.target) * 100)}%<br>这一关算恶魔赢`, 'var(--blood)'); say(pick('devilWin')); dv.laugh = 1; SFX.laugh(); }
+    await wait(1500);
+    banner('');
+    await loadBullet(won);
+    if (!G.hints.has('load')) await hint('load', `每一关的<b>赢家</b>往左轮里装一发自己的子弹。<br><b>金弹</b> = 你的，<em>红弹</em> = 恶魔的。<br>这个底注的 Boss 关结束时，赢家开枪。`);
+    if (b.idx === 2) {
+      const alive = await bossShot(won);
+      if (!alive) return gameOver();
+    }
+    await cashOut(won);
+    if (DL.advance(run, rng) === 'victory') return victory();
+    if (run.blind === 0) { // new ante: the drum is emptied
+      await ejectCasings();
+      if (dv.tfall > 0) await reviveDevil();
+    }
+    $('hud').classList.remove('cine');
+    await openShop();
+  }
+
+  async function loadBullet(won) {
+    const run = G.run, who = won ? 'you' : 'devil';
+    DL.loadBullet(run, won);
+    clearFlyers();
+    cam.tpos.set(0.04, 1.26, 0.6); cam.tlook.copy(GUN_POSES.show.p);
+    await moveGun('show', 600);
+    await swing(true);
+    const bullet = new THREE.Mesh(bulletGeo, bulletMat[who]); scene.add(bullet);
+    const from = who === 'you' ? new THREE.Vector3(0.1, 0.9, 0.7) : new THREE.Vector3(0.3, 1.0, -1.1);
+    const slot = G.chamberOrder.length, target = new THREE.Vector3();
+    drum.children[1 + slot].getWorldPosition(target);
+    $('banner').style.top = '22%';
+    banner(won ? '<span style="font-size:.6em">你装进一发</span> <b>金弹</b>' : '<span style="font-size:.6em">恶魔装进一发</span> <em>红弹</em>', '', '');
+    await tween(650, (k) => {
+      const e = ease(k);
+      bullet.position.lerpVectors(from, target, e); bullet.position.y += Math.sin(k * Math.PI) * 0.25;
+      bullet.rotation.x = Math.PI / 2 * e + k * 6; bullet.rotation.z = k * 3;
+    });
+    scene.remove(bullet);
+    G.chamberOrder.push(who); setHoles(); SFX.load(); shake = 0.2;
+    const z0 = drum.rotation.z;
+    tween(380, (k) => { drum.rotation.z = z0 + ease(k) * (Math.PI / 3); });
+    hud();
+    const span = $('cyl').children[slot]; if (span) span.classList.add('pop');
+    $('cyl').style.transform = `rotate(${G.chamberOrder.length * 60}deg)`; setTimeout(() => ($('cyl').style.transform = ''), 500 * SPEED);
+    await wait(1100);
+    banner(''); $('banner').style.top = '';
+    await swing(false);
+    if (G.b.idx !== 2) { camHome(); await moveGun('rest', 500); }
+  }
+
+  async function bossShot(won) {
+    const run = G.run;
+    const shot = DL.bossShot(run, won, rng);
+    G.phase = 'shot';
+    G.stats.shots.push(shot);
+    const youShoot = shot.shooter === 'you', n = run.gun[shot.shooter];
+    const pctTxt = `${n}/6 · ${Math.round(shot.p * 100)}%`;
+    if (youShoot) {
+      banner('你开枪', `枪里有 <b>${n} 发金弹</b>　命中 <b>${pctTxt}</b>`, 'var(--gold)');
+      say(pick('youAim'));
+      cam.tpos.copy(CAM_HOME.pos).add(new THREE.Vector3(0.05, -0.08, -0.25)); cam.tlook.set(0, 1.5, -1.5);
+      await moveGun('mine', 800);
+    } else {
+      banner('恶魔开枪', `枪里有 <em>${n} 发红弹</em>　命中 <em>${pctTxt}</em>`, 'var(--blood)');
+      say(pick('devilAim'));
+      dv.tlean = 0.25;
+      await moveGun('his', 1000);
+      cam.tpos.copy(CAM_HOME.pos).add(new THREE.Vector3(0, -0.06, -0.15)); cam.tlook.copy(gun.position);
+    }
+    await wait(900); banner('');
+    SFX.spin();
+    const z0 = drum.rotation.z, spins = Math.PI * 2 * 3 + Math.floor(rng() * 6) * Math.PI / 3;
+    await tween(1300, (k) => { drum.rotation.z = z0 + (1 - Math.pow(1 - k, 3)) * spins; });
+    for (let i = 0; i < (youShoot ? 2 : 3); i++) { SFX.heart(); post.uniforms.red.value = youShoot ? 0 : 0.12; await wait(560); post.uniforms.red.value = 0; }
+    hammer.rotation.x = -0.6; SFX.click();
+    await wait(youShoot ? 400 : 700);
+    hammer.rotation.x = 0;
+    let alive = true;
+    if (shot.hit) {
+      SFX.bang(); shake = 0.9; muzzle.visible = true; flashLight.position.copy(gun.position); flashLight.intensity = 7;
+      flashEl($('flash'), 0.95, 180); setTimeout(() => { muzzle.visible = false; }, 90);
+      if (youShoot) {
+        G.stats.kills++;
+        dv.tfall = 1; eyeMat.color.set(0x220a04);
+        burstCoins(70, new THREE.Vector3(0, 1.2, -1.35)); setTimeout(() => SFX.coins(20), 200);
+        run.money += CFG.devilKillMoney;
+        await wait(500);
+        banner('命中！', `恶魔倒下了。掉落 <b>$${CFG.devilKillMoney}</b> 和一件遗物`, 'var(--gold)');
+        bump($('money')); hud();
+        await wait(1700);
+        banner('');
+        camHome(); await moveGun('rest', 500);
+        await devilDrop();
+      } else {
+        alive = false;
+        flashEl($('hurt'), 1, 1400); post.uniforms.red.value = 0.7;
+        cam.troll = 1.2; cam.tpos.set(0.25, 0.95, 1.0); cam.tlook.set(0.6, 0.6, 0.2); cam.speed = 1.6;
+        await wait(800);
+        $('fade').style.opacity = 1;
+        await wait(1400);
+      }
+    } else {
+      SFX.click(); muzzle.visible = false;
+      if (youShoot) { banner('咔。', '空膛。恶魔活下来了。', 'var(--dim)'); say(pick('miss')); dv.laugh = 1; SFX.laugh(); }
+      else { banner('咔。', '空膛。<b>你活下来了。</b>', 'var(--green)'); say(pick('spared')); }
+      await wait(1800);
+      banner('');
+      dv.tlean = 0; camHome(); await moveGun('rest', 500);
+    }
+    G.phase = 'load';
+    return alive;
+  }
+
+  function devilDrop() {
+    const run = G.run, ids = DL.devilDrop(run, rng);
+    G.phase = 'pick'; $('hud').classList.add('away');
+    const full = () => run.jokers.length >= CFG.jokerSlots;
+    const render = () => {
+      $('pickSub').innerHTML = full() ? '<em>小丑槽满了</em>：先点上方你的小丑卖掉一张，再来选。' : '选一张小丑带走';
+      $('pickRow').innerHTML = ids.map((id) => {
+        const d = DL.JOKER_BY_ID[id];
+        return `<div class="item">${jokerCard(d)}<button class="btn gold" data-take="${id}" ${full() ? 'disabled' : ''}>带走</button></div>`;
+      }).join('');
+    };
+    render();
+    $('pick').hidden = false;
+    return new Promise((res) => {
+      G.onSold = render;
+      const done = () => { $('pick').hidden = true; $('hud').classList.remove('away'); G.onSold = null; hideTip(); res(); };
+      $('pickRow').onclick = (e) => {
+        const id = e.target.dataset && e.target.dataset.take;
+        if (!id || full()) return;
+        run.jokers.push(id); SFX.buy(); renderJokers(); done();
+      };
+      $('pickSkip').onclick = done;
+    });
+  }
+  function jokerCard(d) {
+    return `<div class="card r${d.rarity}"><span class="nm">${d.name}</span><span class="face">${FACE[d.id] || '丑'}</span><span>${d.desc}</span></div>`;
+  }
+
+  async function cashOut(won) {
+    const run = G.run, b = G.b;
+    const res = DL.endBlindMoney(run, { idx: b.idx, hands: 0 }, won);
+    const el = $('cash');
+    el.innerHTML = '';
+    el.hidden = false;
+    if (!res.lines.length) res.lines.push(['没有收入', 0]);
+    for (const [k, v] of res.lines) { const d = document.createElement('div'); d.innerHTML = `<span>${k}</span><span>+$${v}</span>`; el.appendChild(d); SFX.coins(2); await wait(260); }
+    const s = document.createElement('div'); s.className = 'sum'; s.innerHTML = `<span>收入</span><span>+$${res.total}</span>`; el.appendChild(s);
+    bump($('money')); hud();
+    await wait(1200);
+    el.hidden = true;
+  }
+
+  async function ejectCasings() {
+    if (!G.chamberOrder.length) return;
+    cam.tpos.set(0.42, 1.18, 0.32); cam.tlook.copy(GUN_POSES.rest.p);
+    await wait(300);
+    const p = new THREE.Vector3(); drum.getWorldPosition(p);
+    G.chamberOrder.forEach((who) => {
+      const m = new THREE.Mesh(bulletGeo, bulletMat[who]); m.position.copy(p); scene.add(m);
+      flyers.push({ m, v: new THREE.Vector3(rand(-0.6, 0.6), rand(0.8, 1.4), rand(0.1, 0.6)), spin: new THREE.Vector3(rand(-15, 15), rand(-15, 15), 0), rest: false });
+    });
+    SFX.spin(); G.chamberOrder = []; setHoles(); hud();
+    banner('新的底注', '左轮清空', 'var(--dim)');
+    await wait(1100);
+    banner(''); camHome();
+  }
+  async function reviveDevil() {
+    eyeMat.color.set(0xffd23a); dv.tfall = 0; eyeLight.intensity = 3;
+    SFX.drone(); say(pick('revive'));
+    await wait(1200);
+  }
+
+  /* ─── shop ─── */
+  async function openShop() {
+    G.phase = 'shop'; G.busy = false; G.rerolls = 0; $('hud').classList.add('away'); G.shop = DL.rollShop(G.run, rng);
+    clearFlyers();
+    renderShop();
+    $('shop').hidden = false;
+    hud(); renderJokers();
+    await hint('shop', `<b>商店</b>：小丑是被动加成（最多 5 张），星球牌永久升级一种牌型。<br>点上方你的小丑可以<b>卖掉</b>。每存 $5 下关多 $1 利息。`);
+  }
+  function renderShop() {
+    const run = G.run;
+    $('shopSub').innerHTML = `你有 <b>$${run.money}</b>　·　下一关：${run.blind === 2 ? `<em>Boss · ${run.boss.name}（${run.boss.desc}）</em>` : DL.BLIND_NAMES[run.blind]}，目标 <b>${fmt(DL.blindTarget(run.ante, run.blind, run.boss))}</b>`;
+    $('shopRow').innerHTML = G.shop.map((it, i) => {
+      let card;
+      if (it.kind === 'joker') card = jokerCard(DL.JOKER_BY_ID[it.id]);
+      else {
+        const p = DL.PLANETS.find((x) => x.id === it.id), h = DL.HANDS[p.hand], lv = run.levels[p.hand];
+        card = `<div class="card pl"><span class="nm">${p.name}</span><span class="face">●</span><span>升级 <b>${h[0]}</b><br>Lv.${lv} → ${lv + 1}<br><i class="c">+${h[3]} 筹码</i> <i class="m">+${h[4]} 倍率</i></span></div>`;
+      }
+      if (it.sold) card = card.replace('class="card', 'class="card sold');
+      const full = it.kind === 'joker' && run.jokers.length >= CFG.jokerSlots;
+      return `<div class="item">${card}<span class="price">$${it.cost}</span><button class="btn gold" data-buy="${i}" ${it.sold || run.money < it.cost || full ? 'disabled' : ''}>${it.sold ? '已买' : full ? '槽满' : '买'}</button></div>`;
+    }).join('');
+    const rc = CFG.rerollBase + G.rerolls;
+    $('rerollBtn').textContent = `刷新 $${rc}`; $('rerollBtn').disabled = run.money < rc;
+  }
+  $('shopRow').onclick = (e) => {
+    const i = e.target.dataset && e.target.dataset.buy;
+    if (i == null) return;
+    const it = G.shop[+i];
+    if (!it || it.sold) return;
+    if (DL.buy(G.run, it)) { it.sold = true; SFX.buy(); renderShop(); renderJokers(); hud(); bump($('money')); }
+  };
+  $('rerollBtn').onclick = () => {
+    const rc = CFG.rerollBase + G.rerolls;
+    if (G.run.money < rc) return;
+    G.run.money -= rc; G.rerolls++; G.shop = DL.rollShop(G.run, rng); SFX.spin(); renderShop(); hud();
+  };
+  $('nextBtn').onclick = async () => { $('shop').hidden = true; $('hud').classList.remove('away'); hideTip(); hideHint(); await startBlind(); };
+
+  /* ─── joker tooltip & selling ─── */
+  let tipFor = null;
+  function hideTip() { $('jtip').hidden = true; tipFor = null; document.querySelectorAll('.jk.on').forEach((x) => x.classList.remove('on')); }
+  $('jbar').addEventListener('click', (e) => {
+    const el = e.target.closest('.jk'); if (!el || !el.dataset.j) return;
+    const id = el.dataset.j;
+    if (tipFor === id) { hideTip(); return; }
+    hideTip(); tipFor = id; el.classList.add('on');
+    const d = DL.JOKER_BY_ID[id], canSell = G.phase === 'shop' || G.phase === 'pick';
+    const tip = $('jtip'), r = el.getBoundingClientRect();
+    tip.innerHTML = `<span class="nm">${d.name}</span><span>${d.desc}</span>${canSell ? `<button class="btn disc" id="sellBtn" style="justify-self:center;font-size:15px;padding:6px 14px 8px">卖出 +$${DL.sellValue(id)}</button>` : ''}`;
+    tip.style.left = `${Math.min(innerWidth - 110, Math.max(110, r.left + r.width / 2))}px`; tip.style.top = `${r.bottom + 10}px`;
+    tip.hidden = false;
+    const sb = $('sellBtn');
+    if (sb) sb.onclick = () => {
+      const run = G.run, k = run.jokers.indexOf(id);
+      if (k < 0) return;
+      run.jokers.splice(k, 1); run.money += DL.sellValue(id); SFX.coins(4);
+      hideTip(); renderJokers(); hud();
+      if (G.phase === 'shop') renderShop();
+      if (G.onSold) G.onSold();
+    };
+  });
+
+  /* ─── endings ─── */
+  function endStats(extra) {
+    const s = G.stats, run = G.run;
+    $('endStats').innerHTML = [
+      ['到达', run.ante > CFG.antes ? '全部 8 个底注' : `底注 ${run.ante} · ${DL.BLIND_NAMES[run.blind]}`],
+      ['赢下的关', `${s.won} / ${s.won + s.lost}`],
+      ['击倒恶魔', `${s.kills} 次`],
+      ['开枪', `你 ${s.shots.filter((x) => x.shooter === 'you').length} · 恶魔 ${s.shots.filter((x) => x.shooter === 'devil').length}`],
+      ['最高一手', s.best ? `${fmt(s.best)}（${s.bestName}）` : '—'],
+      ...(extra || []),
+    ].map(([k, v]) => `<span>${k}</span><span>${v}</span>`).join('');
+  }
+  async function gameOver() {
+    G.phase = 'end';
+    $('hud').hidden = true; banner(''); $('say').style.opacity = 0;
+    $('endTitle').textContent = '你死了'; $('endTitle').style.color = 'var(--blood)';
+    const sh = G.stats.shots[G.stats.shots.length - 1];
+    $('endSub').innerHTML = `枪里有 ${sh.bullets.devil} 发红弹，命中率 ${Math.round(sh.p * 100)}%。<br>恶魔把你的筹码收进了口袋。`;
+    endStats();
+    $('end').hidden = false;
+    await wait(300);
+    $('fade').style.opacity = 0.6;
+  }
+  async function victory() {
+    G.phase = 'end';
+    SFX.win();
+    $('hud').hidden = true;
+    const fw = G.stats.finalWin;
+    $('endTitle').textContent = fw ? '你赢下了恶魔赌局' : '你活着离开了';
+    $('endTitle').style.color = fw ? 'var(--gold)' : 'var(--green)';
+    $('endSub').innerHTML = fw ? '八个底注，最终 Boss 也倒在了你的牌下。' : '最后一个 Boss 没打过，但那一枪没打中你。<br>活着就算赢。';
+    endStats();
+    $('end').hidden = false;
+  }
+
+  /* ═════════ input ═════════ */
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  function cardAt(ev) {
+    ndc.set((ev.clientX / innerWidth) * 2 - 1, -(ev.clientY / innerHeight) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    const meshes = handNow().map((c) => C3(c).front);
+    const hit = ray.intersectObjects(meshes, false)[0];
+    return hit ? hit.object.userData.card.c : null;
+  }
+  canvas.addEventListener('pointerdown', (ev) => {
+    A();
+    hideTip();
+    if (G.phase !== 'play' || G.busy) return;
+    const c = cardAt(ev);
+    if (!c) return;
+    if (G.sel.has(c)) G.sel.delete(c);
+    else if (G.sel.size < 5) G.sel.add(c);
+    else { SFX.click(); return; }
+    SFX.pick(); layoutHand(); hud();
+  });
+  canvas.addEventListener('pointermove', (ev) => {
+    if (ev.pointerType !== 'mouse' || G.phase !== 'play') return;
+    const c = cardAt(ev);
+    if (c !== G.hover) { G.hover = c; layoutHand(); canvas.style.cursor = c ? 'pointer' : ''; }
+  });
+  $('playBtn').onclick = play;
+  $('discBtn').onclick = discard;
+  $('sortBtn').onclick = () => { G.sortBy = G.sortBy === 'rank' ? 'suit' : 'rank'; sortHand(); layoutHand(); hud(); };
+  $('startBtn').onclick = startRun;
+  $('againBtn').onclick = startRun;
+  const openHelp = () => {
+    $('handTable').innerHTML = '<tr><td>牌型</td><td>等级</td><td>筹码</td><td>倍率</td></tr>' + DL.HAND_ORDER.map((h) => {
+      const H = DL.HANDS[h], lv = G.run ? G.run.levels[h] : 1;
+      return `<tr><td>${H[0]}</td><td>${lv}</td><td><i class="c">${H[1] + H[3] * (lv - 1)}</i></td><td><i class="m">${H[2] + H[4] * (lv - 1)}</i></td></tr>`;
+    }).join('');
+    $('help').hidden = false;
+  };
+  $('rulesBtn').onclick = openHelp;
+  $('helpBtn').onclick = openHelp;
+  $('helpClose').onclick = () => { $('help').hidden = true; };
+  window.addEventListener('keydown', (e) => {
+    if (G.phase !== 'play') return;
+    if (e.key === 'Enter') play();
+    if (e.key === 'Backspace' || e.key === 'd') discard();
+  });
+  window.addEventListener('resize', resize);
+
+  /* ═════════ loop ═════════ */
+  let last = performance.now(), t = 0;
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now; t += dt;
+    for (const o of cards3d.values()) {
+      o.update(dt, t);
+      const sel = G.sel.has(o.c) ? 0.18 + 0.08 * Math.sin(t * 6) : 0;
+      o.front.material.emissive.setRGB(sel, sel * 0.75, 0);
+    }
+    for (const f of flyers) {
+      if (f.rest) continue;
+      f.v.y -= 6 * dt; f.m.position.addScaledVector(f.v, dt);
+      f.m.rotation.x += f.spin.x * dt; f.m.rotation.y += f.spin.y * dt;
+      if (f.m.position.y < 0.785 && f.m.position.z > -1.4 && f.m.position.z < 0.8 && Math.abs(f.m.position.x) < 1.25) {
+        f.m.position.y = 0.785; f.v.multiplyScalar(0.35); f.v.y = Math.abs(f.v.y) * 0.3;
+        if (f.v.length() < 0.25) { f.rest = true; f.m.rotation.set(0, Math.random() * 6, 0); }
+      }
+      if (f.m.position.y < -1) f.rest = true;
+    }
+    // coins on the coat drain toward what's left of the target
+    if (G.phase === 'title') coinWant = COINS;
+    coinShown += (coinWant - coinShown) * (1 - Math.exp(-3 * dt));
+    coinIM.count = Math.max(0, Math.round(coinShown));
+    // devil life
+    dv.nod = Math.max(0, dv.nod - dt * 2.5); dv.laugh = Math.max(0, dv.laugh - dt * 0.7); dv.flinch = Math.max(0, dv.flinch - dt * 1.8);
+    dv.lean += (dv.tlean - dv.lean) * (1 - Math.exp(-4 * dt));
+    dv.fall += (dv.tfall - dv.fall) * (1 - Math.exp(-5 * dt));
+    head.position.y = 0.92 + Math.sin(t * 1.3) * 0.01 + Math.sin(t * 30) * 0.012 * dv.laugh;
+    head.rotation.y = Math.sin(t * 0.7) * 0.12;
+    head.rotation.x = -dv.flinch * 0.45 + Math.sin(dv.nod * Math.PI) * 0.12 - dv.laugh * 0.25 + dv.fall * 0.6;
+    body.rotation.x = -dv.fall * 1.05 + dv.lean * 0.4 - dv.flinch * 0.12;
+    body.position.z = -dv.fall * 0.2;
+    arms.forEach((a, i) => { a.rotation.x = -dv.fall * 0.8 + Math.sin(t * 1.1 + i) * 0.03; });
+    eyeLight.intensity += ((dv.tfall ? 0 : 0.6 + Math.sin(t * 9) * 0.1) - eyeLight.intensity) * 0.05;
+    lamp.intensity = 2.0 * (Math.random() < 0.012 ? 0.5 : 1);
+    flames.forEach((f, i) => { f.scale.y = 1 + Math.sin(t * 13 + i * 2) * 0.25; });
+    candleL.intensity = 0.65 + Math.sin(t * 11) * 0.08;
+    flashLight.intensity *= 0.82;
+    for (let i = 0; i < DUST; i++) { dustPos[i * 3 + 1] -= dt * 0.02; dustPos[i * 3] += Math.sin(t + i) * dt * 0.01; if (dustPos[i * 3 + 1] < 0.8) dustPos[i * 3 + 1] = 2.1; }
+    dustGeo.attributes.position.needsUpdate = true;
+    // title: slow orbit
+    if (G.phase === 'title') { cam.tpos.set(Math.sin(t * 0.15) * 0.5, 1.35, 1.1); cam.tlook.set(0, 1.2, -1.2); }
+    const ck = 1 - Math.exp(-cam.speed * dt);
+    cam.pos.lerp(cam.tpos, ck); cam.look.lerp(cam.tlook, ck); cam.roll += (cam.troll - cam.roll) * ck;
+    shake = Math.max(0, shake - dt * 1.6);
+    const sh = REDUCE ? 0 : shake * shake * 0.06;
+    camera.position.copy(cam.pos).add(new THREE.Vector3(rand(-sh, sh), rand(-sh, sh), 0));
+    camera.lookAt(cam.look);
+    if (cam.roll) camera.rotateZ(cam.roll);
+    renderer.setRenderTarget(rt); renderer.render(scene, camera);
+    renderer.setRenderTarget(null); renderer.render(postScene, postCam);
+    requestAnimationFrame(frame);
+  }
+  resize();
+  requestAnimationFrame(frame);
+
+  // test hooks: speed up, inspect, and auto-play with the simulator's greedy search
+  function bestPlay() {
+    const h = handNow(), boss = G.b.idx === 2 ? G.b.boss : null;
+    let best = null;
+    const n = h.length;
+    for (let mask = 1; mask < 1 << n; mask++) {
+      let k = 0; for (let x = mask; x; x &= x - 1) k++;
+      if (k > 5) continue;
+      const p = h.filter((_, i) => mask & (1 << i)), held = h.filter((_, i) => !(mask & (1 << i)));
+      const s = DL.score(G.run, p, held, boss, true);
+      if (!best || s.total > best.total) best = { total: s.total, p };
+    }
+    return best.p;
+  }
+  window.__T = {
+    G, DL,
+    speed(s) { SPEED = s; },
+    selectBest() { G.sel = new Set(bestPlay()); layoutHand(); hud(); },
+    play, discard,
+  };
+})();
+
+</script>
