@@ -1,4 +1,4 @@
-/* 恶魔赌局 · shared rules. The simulator (Node) and the playable demo (browser) both run this file,
+/* 恶魔赌局 · shared rules (v3: every hand is a duel with the devil). The simulator (Node) and the playable demo (browser) both run this file,
    so the numbers in the report are the numbers you play. No DOM, no randomness of its own: pass an rng. */
 (function (root) {
   'use strict';
@@ -105,13 +105,8 @@
     { id: 'scary', name: '鬼脸', cost: 4, rarity: 1, desc: '计分的人头牌各 +30 筹码', onCard: (c) => (isFace(c) ? { chips: 30 } : null) },
     { id: 'even', name: '偶数史蒂文', cost: 4, rarity: 1, desc: '计分的偶数牌各 +4 倍率', onCard: (c) => (c.r <= 10 && c.r % 2 === 0 ? { mult: 4 } : null) },
     { id: 'odd', name: '奇数托德', cost: 4, rarity: 1, desc: '计分的奇数牌各 +31 筹码', onCard: (c) => (c.r === 14 || (c.r <= 9 && c.r % 2 === 1) ? { chips: 31 } : null) },
-    { id: 'abstract', name: '抽象小丑', cost: 4, rarity: 1, desc: '每张小丑 +3 倍率', onHand: (x) => ({ mult: 3 * x.run.jokers.length }) },
     { id: 'half', name: '半个小丑', cost: 4, rarity: 1, desc: '出牌不超过 3 张时 +20 倍率', onHand: (x) => (x.played.length <= 3 ? { mult: 20 } : null) },
-    { id: 'green', name: '绿色小丑', cost: 4, rarity: 1, desc: '每出一手 +1 倍率，每弃一次 -1（会累积）', onHand: (x) => ({ mult: x.run.green }) },
-    { id: 'nova', name: '超新星', cost: 5, rarity: 2, desc: '这个牌型本局打过几次，就 +几 倍率', onHand: (x) => ({ mult: x.run.plays[x.type] + 1 }) },
-    { id: 'constel', name: '星座', cost: 6, rarity: 2, desc: '每用过一张星球牌，×0.1 倍率（会累积）', onHand: (x) => (x.run.planetsUsed ? { xmult: 1 + 0.1 * x.run.planetsUsed } : null) },
     { id: 'banana', name: '大香蕉', cost: 8, rarity: 3, desc: '×3 倍率', onHand: () => ({ xmult: 3 }) },
-    { id: 'bull', name: '公牛', cost: 6, rarity: 2, desc: '你每有 $1，+2 筹码', onHand: (x) => (x.run.money > 0 ? { chips: 2 * x.run.money } : null) },
     { id: 'gold', name: '金小丑', cost: 6, rarity: 1, desc: '每关结束 +$4', endOfBlind: () => 4 },
   ];
   const JOKER_BY_ID = Object.fromEntries(JOKERS.map((j) => [j.id, j]));
@@ -122,38 +117,40 @@
   ].map(([id, name, hand]) => ({ id, name, hand, cost: 3 }));
 
   /* ───────────── blinds, bosses, the revolver ───────────── */
+  // A blind is a race: each turn the devil plays first (face up), then you answer. Only the higher hand scores, onto its
+  // owner's track. First to the target wins the blind. The devil's poker hands are multiplied by his power for the ante.
   const CONFIG = {
     antes: 8,
-    anteBase: [300, 1000, 2300, 4600, 9000, 16500, 28000, 47000],
-    blindMult: [1, 1.5, 2],
+    target: [600, 1800, 4400, 9000, 18000, 34000, 58000, 94000],
+    devilPower: [0.5, 1.6, 4, 8, 15, 27, 44, 70],
+    blindPower: [1, 1.2, 1.4],
     blindReward: [3, 4, 5],
-    hands: 4, discards: 3, handSize: 8, jokerSlots: 5, startMoney: 4,
-    interestPer: 5, interestCap: 5,
-    shopJokers: 2, shopPlanets: 2, rerollBase: 4,
+    handSize: 8, devilHandSize: 8, maxTurns: 14, jokerSlots: 5, startMoney: 4,
+    shopJokers: 2, shopPlanets: 2, rerollBase: 3,
     chambers: 6,
     devilKillMoney: 8, bountyPerLive: 4, dudCost: 3,
     devilSureBelow: 0.75, devilLiveSure: 0.7, devilLiveNear: 0.4,
   };
   const BOSSES = [
-    { id: 'wall', name: '高墙', desc: '目标分 ×2', targetMult: 2 },
-    { id: 'water', name: '深水', desc: '没有弃牌', discards: 0 },
-    { id: 'manacle', name: '镣铐', desc: '手牌上限 -1', handSize: -1 },
-    { id: 'flint', name: '燧石', desc: '牌型基础筹码和倍率减半', halve: true },
-    { id: 'club', name: '梅花之咒', desc: '梅花牌不计分', debuff: 'c' },
-    { id: 'heart', name: '红心之咒', desc: '红心牌不计分', debuff: 'h' },
-    { id: 'needle', name: '独针', desc: '只能出 1 手，但目标只有一半', hands: 1, targetMult: 0.5 },
+    { id: 'wall', name: '高墙', desc: '恶魔的牌 ×1.5', devilMult: 1.5 },
+    { id: 'manacle', name: '镣铐', desc: '你的手牌上限 -1', handSize: -1 },
+    { id: 'flint', name: '燧石', desc: '你的牌型基础筹码和倍率减半', halve: true },
+    { id: 'club', name: '梅花之咒', desc: '你的梅花牌不计分', debuff: 'c' },
+    { id: 'heart', name: '红心之咒', desc: '你的红心牌不计分', debuff: 'h' },
+    { id: 'dark', name: '暗牌', desc: '恶魔的牌扣着出，你看不到他这手多少分', hidden: true },
   ];
   const BLIND_NAMES = ['小盲注', '大盲注', 'Boss'];
 
-  function blindTarget(ante, idx, boss) {
-    const base = CONFIG.anteBase[Math.min(ante, CONFIG.antes) - 1];
-    return Math.round(base * CONFIG.blindMult[idx] * (idx === 2 && boss && boss.targetMult ? boss.targetMult : 1));
+  // both sides race to the same number; the blind and the boss change how hard the devil hits, not the target
+  function blindTarget(ante) { return CONFIG.target[Math.min(ante, CONFIG.antes) - 1]; }
+  function devilMult(ante, idx, boss) {
+    return CONFIG.devilPower[Math.min(ante, CONFIG.antes) - 1] * CONFIG.blindPower[idx] * (idx === 2 && boss && boss.devilMult ? boss.devilMult : 1);
   }
 
   function newRun(rng) {
     return {
       ante: 1, blind: 0, money: CONFIG.startMoney, jokers: [], levels: Object.fromEntries(HAND_ORDER.map((h) => [h, 1])),
-      plays: Object.fromEntries(HAND_ORDER.map((h) => [h, 0])), green: 0, planetsUsed: 0,
+      plays: Object.fromEntries(HAND_ORDER.map((h) => [h, 0])), planetsUsed: 0,
       gun: { chambers: [] }, // this ante's bullets in load order: { who: 'you'|'devil', live }
       boss: BOSSES[Math.floor(rng() * BOSSES.length)], alive: true, devilsKilled: 0, log: [],
     };
@@ -187,21 +184,58 @@
     return { type, name: h[0], chips, mult, total: Math.floor(chips * mult), steps, scoring };
   }
   // after a hand is played (mutates run counters)
-  function notePlayed(run, type) { run.plays[type]++; run.green++; }
-  function noteDiscard(run) { run.green = Math.max(0, run.green - 1); }
+  function notePlayed(run, type) { run.plays[type]++; }
 
   /* ───────────── blind lifecycle ───────────── */
   function startBlind(run, rng) {
     const idx = run.blind, boss = idx === 2 ? run.boss : null;
     return {
-      idx, boss, target: blindTarget(run.ante, idx, boss), score: 0,
-      hands: boss && boss.hands ? boss.hands : CONFIG.hands,
-      discards: boss && boss.discards === 0 ? 0 : CONFIG.discards,
+      idx, boss, target: blindTarget(run.ante), dm: devilMult(run.ante, idx, boss),
+      you: 0, devil: 0, turn: 0,
       handSize: CONFIG.handSize + (boss && boss.handSize ? boss.handSize : 0),
       deck: shuffle(makeDeck(), rng), hand: [],
+      ddeck: shuffle(makeDeck(), rng), dhand: [], rng,
     };
   }
-  function draw(b) { while (b.hand.length < b.handSize && b.deck.length) b.hand.push(b.deck.pop()); }
+  // when a deck runs out it is reshuffled from every card not in that hand
+  function refill(hand, rng) { const held = new Set(hand.map((c) => c.r + c.s)); return shuffle(makeDeck().filter((c) => !held.has(c.r + c.s)), rng); }
+  function draw(b) {
+    while (b.hand.length < b.handSize) { if (!b.deck.length) b.deck = refill(b.hand, b.rng); b.hand.push(b.deck.pop()); }
+    while (b.dhand.length < CONFIG.devilHandSize) { if (!b.ddeck.length) b.ddeck = refill(b.dhand, b.rng); b.dhand.push(b.ddeck.pop()); }
+  }
+  // the devil plays the best plain poker hand in his 8 cards, multiplied by his power
+  function devilBest(cards) {
+    let best = null;
+    const n = cards.length;
+    for (let m = 1; m < 1 << n; m++) {
+      let k = 0; for (let x = m; x; x &= x - 1) k++;
+      if (k > 5) continue;
+      const p = []; for (let i = 0; i < n; i++) if (m & (1 << i)) p.push(cards[i]);
+      const ev = evaluate(p), h = HANDS[ev.type];
+      const raw = (h[1] + ev.scoring.reduce((a, c) => a + cardChips(c), 0)) * h[2];
+      if (!best || raw > best.raw || (raw === best.raw && p.length < best.cards.length)) best = { raw, cards: p, type: ev.type, scoring: ev.scoring };
+    }
+    return best;
+  }
+  function devilTurn(b) {
+    const d = devilBest(b.dhand), h = HANDS[d.type];
+    const chips = h[1] + d.scoring.reduce((a, c) => a + cardChips(c), 0);
+    b.dhand = b.dhand.filter((c) => !d.cards.includes(c));
+    return { cards: d.cards, scoring: d.scoring, type: d.type, name: h[0], chips, mult: h[2], power: b.dm, total: Math.floor(d.raw * b.dm) };
+  }
+  // only the higher hand scores; a tie scores nothing
+  function resolveTurn(b, mine, dev) {
+    b.turn++;
+    const winner = mine > dev ? 'you' : dev > mine ? 'devil' : 'tie';
+    if (winner === 'you') b.you += mine; else if (winner === 'devil') b.devil += dev;
+    return winner;
+  }
+  function blindResult(b) {
+    if (b.you >= b.target) return 'you';
+    if (b.devil >= b.target) return 'devil';
+    if (b.turn >= CONFIG.maxTurns) return b.you > b.devil ? 'you' : 'devil';
+    return null;
+  }
 
   // The winner of each blind loads one bullet and chooses live or dud; the other side sees a bullet go in, not which.
   // The boss winner loads, spins and fires. Every live round counts, whoever loaded it: your live round can kill you.
@@ -223,20 +257,35 @@
   }
   // the devil only loads after you fail a blind. Boss win: always live. Otherwise he bets on you failing again.
   function devilLoadsLive(blindIdx, ratio, rng) { return blindIdx === 2 || rng() < (ratio < CONFIG.devilSureBelow ? CONFIG.devilLiveSure : CONFIG.devilLiveNear); }
-  // your firepower this blind (points per hand) projected onto this ante's boss: 1.0 = exactly enough
-  function projectBoss(run, score, handsUsed) {
-    const boss = run.boss, hands = boss.hands || CONFIG.hands;
-    return (score / Math.max(1, handsUsed)) * hands / blindTarget(run.ante, 2, boss);
+  // How likely are you to win this ante's boss, if your typical hand is myHand? The devil's raw hand strength is sampled once;
+  // a turn is a coin flip with p = P(devil raw × power < myHand); the blind is a race of needed wins on each side.
+  let DEVIL_RAW = null;
+  function devilRaw() {
+    if (DEVIL_RAW) return DEVIL_RAW;
+    let a = 7; const r = () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const out = []; for (let i = 0; i < 1500; i++) out.push(devilBest(shuffle(makeDeck(), r).slice(0, CONFIG.devilHandSize)).raw);
+    return (DEVIL_RAW = out.sort((x, y) => x - y));
+  }
+  function turnWinChance(myHand, dm) {
+    const d = devilRaw(), lim = myHand / dm;
+    let lo = 0, hi = d.length; while (lo < hi) { const m = (lo + hi) >> 1; if (d[m] < lim) lo = m + 1; else hi = m; }
+    return lo / d.length;
+  }
+  function raceWin(q, needYou, needDevil) {
+    let p = 0, c = 1; // c = C(needYou - 1 + f, f)
+    for (let f = 0; f < needDevil; f++) { if (f) c = (c * (needYou - 1 + f)) / f; p += c * Math.pow(q, needYou) * Math.pow(1 - q, f); }
+    return p;
+  }
+  function bossWinChance(run, myHand) {
+    const dm = devilMult(run.ante, 2, run.boss), target = blindTarget(run.ante), d = devilRaw();
+    const q = turnWinChance(myHand, dm);
+    const devilWinHand = d[Math.floor(d.length * 0.7)] * dm; // when the devil wins a turn his hand is usually a strong one
+    return raceWin(q, Math.max(1, Math.ceil(target / Math.max(1, myHand))), Math.max(1, Math.ceil(target / devilWinHand)));
   }
 
   function endBlindMoney(run, b, won) {
     const lines = [];
-    if (won) {
-      lines.push(['击败' + BLIND_NAMES[b.idx], CONFIG.blindReward[b.idx]]);
-      if (b.hands > 0) lines.push(['剩余出牌 ×' + b.hands, b.hands]);
-    }
-    const interest = Math.min(CONFIG.interestCap, Math.floor(run.money / CONFIG.interestPer));
-    if (interest) lines.push(['利息', interest]);
+    if (won) lines.push(['赢下' + BLIND_NAMES[b.idx], CONFIG.blindReward[b.idx]]);
     for (const j of run.jokers) { const d = JOKER_BY_ID[j]; if (d.endOfBlind) lines.push([d.name, d.endOfBlind()]); }
     const total = lines.reduce((s, l) => s + l[1], 0);
     run.money += total;
@@ -281,8 +330,8 @@
 
   const DL = {
     SUITS, SUIT_SYM, SUIT_NAME, rankLabel, cardChips, isFace, makeDeck, shuffle, HANDS, HAND_ORDER, evaluate, analyze, contains,
-    JOKERS, JOKER_BY_ID, PLANETS, CONFIG, BOSSES, BLIND_NAMES, blindTarget, newRun, score, notePlayed, noteDiscard,
-    startBlind, draw, loadBullet, killMoney, liveCount, hitChance, bossShot, devilLoadsLive, projectBoss, endBlindMoney, advance, rollShop, devilDrop, buy, sellValue,
+    JOKERS, JOKER_BY_ID, PLANETS, CONFIG, BOSSES, BLIND_NAMES, blindTarget, newRun, score, notePlayed,
+    startBlind, draw, devilTurn, resolveTurn, blindResult, devilMult, loadBullet, killMoney, liveCount, hitChance, bossShot, devilLoadsLive, turnWinChance, bossWinChance, endBlindMoney, advance, rollShop, devilDrop, buy, sellValue,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = DL; else root.DL = DL;
 })(typeof window !== 'undefined' ? window : globalThis);

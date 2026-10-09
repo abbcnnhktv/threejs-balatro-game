@@ -61,9 +61,13 @@ button:focus-visible { outline: 1px dotted var(--gold); outline-offset: 3px; }
 #blindLbl { font-size: 21px; letter-spacing: 0.04em; }
 #blindLbl.boss { color: var(--blood); }
 #bossLbl { font-size: 13px; color: #ff9b8f; }
-#scoreNow { font-size: 28px; line-height: 1.1; }
+#scoreNow, #devNow { font-size: 24px; line-height: 1.1; }
+#devNow { color: #ff7466; }
+#devHand { font-size: 15px; color: #ff9b8f; min-height: 22px; }
+#devHand.bump { animation: bump 0.25s steps(3); }
 #scoreNow.bump, #money.bump { animation: bump 0.25s steps(3); }
 .track { height: 8px; background: #000; border: 1px solid #5a4a50; margin-top: 2px; }
+.track.dev i { background: repeating-linear-gradient(90deg, var(--blood) 0 5px, #8a1a12 5px 7px); }
 .track i { display: block; height: 100%; width: 0; background: repeating-linear-gradient(90deg, var(--gold) 0 5px, #c48a12 5px 7px); transition: width 0.35s steps(10); }
 #handRow { min-height: 50px; display: grid; gap: 4px; }
 #handName { font-size: 16px; }
@@ -109,7 +113,6 @@ button:focus-visible { outline: 1px dotted var(--gold); outline-offset: 3px; }
 #bottom { left: 50%; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: flex; gap: 4px; align-items: center; padding: 4px 8px; }
 #bottom .mi { font-size: 18px; }
 #playBtn { color: #8fc4ff; }
-#discBtn { color: #ff8f84; }
 #sortBtn { color: var(--dim); font-size: 14px !important; }
 #deckLbl { right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); font-size: 13px; color: var(--dim); }
 
@@ -185,12 +188,15 @@ table.ht td:nth-child(n+2) { text-align: right; }
   body { font-size: 13px; }
   #hudL { width: 158px; padding: 5px 7px 6px; }
   #blindLbl { font-size: 16px; }
-  #scoreNow { font-size: 21px; }
+  #scoreNow, #devNow { font-size: 18px; }
+  #devHand { font-size: 12px; }
   #handRow { min-height: 42px; }
   #cm span { min-width: 40px; font-size: 14px; }
   #hudR { width: 112px; padding: 5px 7px 6px; }
   #money { font-size: 21px; }
-  #jbar { top: calc(226px + env(safe-area-inset-top, 0px)); gap: 4px; }
+  #jbar { top: calc(306px + env(safe-area-inset-top, 0px)); gap: 4px; }
+  #hudL hr { margin: 3px -4px; }
+  #devRow .lbl { display: none; }
   .jk { width: 48px; height: 64px; font-size: 10px; }
   .jk .face { font-size: 16px; }
   #gunHud { top: calc(150px + env(safe-area-inset-top, 0px)); transform: none; width: 112px; padding: 5px; }
@@ -217,9 +223,13 @@ table.ht td:nth-child(n+2) { text-align: right; }
     <div id="blindLbl">小盲注</div>
     <div id="bossLbl" hidden></div>
     <hr>
-    <div class="sp"><span class="lbl">目标</span><span id="targetLbl" class="num" style="color:#ff7466">300</span></div>
-    <div class="sp"><span class="lbl">得分</span><span id="scoreNow" class="num">0</span></div>
+    <div class="sp"><span class="lbl">目标 <span id="targetLbl" class="num" style="color:var(--ink)">600</span></span><span class="lbl num" id="turnLbl">回合 1</span></div>
+    <div class="sp"><b>你</b><span id="scoreNow" class="num">0</span></div>
     <div class="track"><i id="scoreBar"></i></div>
+    <div class="sp"><em>恶魔</em><span id="devNow" class="num">0</span></div>
+    <div class="track dev"><i id="devBar"></i></div>
+    <hr>
+    <div id="devRow"><span class="lbl">恶魔这手</span><div id="devHand">—</div></div>
     <hr>
     <div id="handRow">
       <div id="handName" class="lbl">选牌 · 最多 5 张</div>
@@ -230,8 +240,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
   <div id="jbar"></div>
   <div id="hudR" class="win">
     <div id="money" class="num">$4</div>
-    <div class="sp"><span class="lbl">出牌</span><i class="c num" id="handsLbl">4</i></div>
-    <div class="sp"><span class="lbl">弃牌</span><i class="m num" id="discLbl">3</i></div>
+    <div class="sp"><span class="lbl">底注</span><span class="num" id="anteR">1/8</span></div>
     <button id="helpBtn" class="mi">规则</button>
   </div>
   <div id="gunHud" class="win">
@@ -241,7 +250,6 @@ table.ht td:nth-child(n+2) { text-align: right; }
   </div>
   <div id="bottom" class="win">
     <button class="mi" id="playBtn">出牌</button>
-    <button class="mi" id="discBtn">弃牌</button>
     <button class="mi" id="sortBtn">按点数</button>
   </div>
   <div id="deckLbl" class="num">牌堆 44</div>
@@ -267,7 +275,8 @@ table.ht td:nth-child(n+2) { text-align: right; }
     <h1>恶魔赌局</h1>
     <div class="tag">小丑牌 × 左轮　·　八个底注</div>
     <div class="lines win">
-      <span>和小丑牌一样：每个底注打<b>小盲、大盲、Boss</b>，用德州牌型凑分，<i class="c">筹码</i> × <i class="m">倍率</i>。</span>
+      <span>每个底注打<b>小盲、大盲、Boss</b> 三关。每一回合<em>恶魔先出牌</em>，你再出，按德州牌型算分（<i class="c">筹码</i> × <i class="m">倍率</i>）。</span>
+      <span><b>只有大的一方得分</b>，谁先攒到目标分谁赢下这一关。打不过的回合，就丢几张烂牌，把好牌留到下回合。</span>
       <span>每一关的赢家往左轮里装一发子弹，自己选<b>实弹</b>还是<i class="d">哑弹</i>。对方只看得到装了一发，看不到是什么。</span>
       <span><b>Boss 关的赢家开枪</b>。枪里所有实弹都算数，包括你自己装的。</span>
       <span>打中恶魔，按枪里的实弹数领赏金；<em>恶魔打中你，游戏结束</em>。</span>
@@ -284,13 +293,14 @@ table.ht td:nth-child(n+2) { text-align: right; }
   <div class="ovIn win" style="padding:18px">
     <h2>规则</h2>
     <div class="rules">
-      <span><b>出牌</b>：每关 4 次出牌、3 次弃牌，手牌 8 张。每次打 1–5 张，按牌型得分：（牌型<i class="c">筹码</i> + 计分牌点数）×<i class="m">倍率</i>，再经过小丑加成。累计到目标分就赢下这一关。</span>
+      <span><b>对决</b>：你和恶魔各拿 8 张牌、各用一副牌。每回合恶魔先亮出他的一手，你再选 1–5 张打出。分数 =（牌型<i class="c">筹码</i> + 计分牌点数）×<i class="m">倍率</i>，再经过小丑加成；恶魔的分数要乘上他的<em>力量</em>（底注越高越强）。</span>
+      <span><b>得分</b>：这回合谁的分高，谁把自己的分加到自己的进度上；平局都不加。双方目标分相同，<b>先到的赢下这一关</b>。没有弃牌：打不过的回合，打出几张没用的牌，就等于弃牌。</span>
       <span><b>装弹</b>：每关结束，赢家装 1 发子弹（你过关 = 你装，没过关 = 恶魔装）。你可以选<b>实弹</b>（免费）或<i class="d">哑弹</i>（$3）。恶魔看不到你装的是什么，你也看不到他的。每个底注开始时左轮清空。</span>
       <span><b>开枪</b>：Boss 关结束，赢家装弹后转轮开枪。命中率 = 枪里实弹数 / 6，<em>不管实弹是谁装的</em>。</span>
       <span><b>结果</b>：你打中 → 恶魔倒下，赏金 $8 + 每发实弹 $4，再三选一一张小丑。恶魔打中 → 你死了。没打中 → 继续。</span>
       <span><b>怎么选</b>：觉得自己能赢下 Boss 关，就装实弹，赏金更高；没把握就花 $3 装哑弹，免得 Boss 关输了被自己的子弹打死。</span>
       <span><b>输一关</b>不会结束游戏，只是没有过关奖励，并且让恶魔装一发。</span>
-      <span><b>商店</b>：每关之后。每存 $5 有 $1 利息（最多 $5）。</span>
+      <span><b>商店</b>：每关之后，卖小丑牌和星球牌（升级牌型）。</span>
       <span><b>通关</b>：打赢第 8 底注的 Boss。活着打完 8 个底注也算活下来。</span>
     </div>
     <table class="ht" id="handTable"></table>
@@ -328,7 +338,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
   </div>
 </div>
 
-<script>/* 恶魔赌局 · shared rules. The simulator (Node) and the playable demo (browser) both run this file,
+<script>/* 恶魔赌局 · shared rules (v3: every hand is a duel with the devil). The simulator (Node) and the playable demo (browser) both run this file,
    so the numbers in the report are the numbers you play. No DOM, no randomness of its own: pass an rng. */
 (function (root) {
   'use strict';
@@ -435,13 +445,8 @@ table.ht td:nth-child(n+2) { text-align: right; }
     { id: 'scary', name: '鬼脸', cost: 4, rarity: 1, desc: '计分的人头牌各 +30 筹码', onCard: (c) => (isFace(c) ? { chips: 30 } : null) },
     { id: 'even', name: '偶数史蒂文', cost: 4, rarity: 1, desc: '计分的偶数牌各 +4 倍率', onCard: (c) => (c.r <= 10 && c.r % 2 === 0 ? { mult: 4 } : null) },
     { id: 'odd', name: '奇数托德', cost: 4, rarity: 1, desc: '计分的奇数牌各 +31 筹码', onCard: (c) => (c.r === 14 || (c.r <= 9 && c.r % 2 === 1) ? { chips: 31 } : null) },
-    { id: 'abstract', name: '抽象小丑', cost: 4, rarity: 1, desc: '每张小丑 +3 倍率', onHand: (x) => ({ mult: 3 * x.run.jokers.length }) },
     { id: 'half', name: '半个小丑', cost: 4, rarity: 1, desc: '出牌不超过 3 张时 +20 倍率', onHand: (x) => (x.played.length <= 3 ? { mult: 20 } : null) },
-    { id: 'green', name: '绿色小丑', cost: 4, rarity: 1, desc: '每出一手 +1 倍率，每弃一次 -1（会累积）', onHand: (x) => ({ mult: x.run.green }) },
-    { id: 'nova', name: '超新星', cost: 5, rarity: 2, desc: '这个牌型本局打过几次，就 +几 倍率', onHand: (x) => ({ mult: x.run.plays[x.type] + 1 }) },
-    { id: 'constel', name: '星座', cost: 6, rarity: 2, desc: '每用过一张星球牌，×0.1 倍率（会累积）', onHand: (x) => (x.run.planetsUsed ? { xmult: 1 + 0.1 * x.run.planetsUsed } : null) },
     { id: 'banana', name: '大香蕉', cost: 8, rarity: 3, desc: '×3 倍率', onHand: () => ({ xmult: 3 }) },
-    { id: 'bull', name: '公牛', cost: 6, rarity: 2, desc: '你每有 $1，+2 筹码', onHand: (x) => (x.run.money > 0 ? { chips: 2 * x.run.money } : null) },
     { id: 'gold', name: '金小丑', cost: 6, rarity: 1, desc: '每关结束 +$4', endOfBlind: () => 4 },
   ];
   const JOKER_BY_ID = Object.fromEntries(JOKERS.map((j) => [j.id, j]));
@@ -452,38 +457,40 @@ table.ht td:nth-child(n+2) { text-align: right; }
   ].map(([id, name, hand]) => ({ id, name, hand, cost: 3 }));
 
   /* ───────────── blinds, bosses, the revolver ───────────── */
+  // A blind is a race: each turn the devil plays first (face up), then you answer. Only the higher hand scores, onto its
+  // owner's track. First to the target wins the blind. The devil's poker hands are multiplied by his power for the ante.
   const CONFIG = {
     antes: 8,
-    anteBase: [300, 1000, 2300, 4600, 9000, 16500, 28000, 47000],
-    blindMult: [1, 1.5, 2],
+    target: [600, 1800, 4400, 9000, 18000, 34000, 58000, 94000],
+    devilPower: [0.5, 1.6, 4, 8, 15, 27, 44, 70],
+    blindPower: [1, 1.2, 1.4],
     blindReward: [3, 4, 5],
-    hands: 4, discards: 3, handSize: 8, jokerSlots: 5, startMoney: 4,
-    interestPer: 5, interestCap: 5,
-    shopJokers: 2, shopPlanets: 2, rerollBase: 4,
+    handSize: 8, devilHandSize: 8, maxTurns: 14, jokerSlots: 5, startMoney: 4,
+    shopJokers: 2, shopPlanets: 2, rerollBase: 3,
     chambers: 6,
     devilKillMoney: 8, bountyPerLive: 4, dudCost: 3,
     devilSureBelow: 0.75, devilLiveSure: 0.7, devilLiveNear: 0.4,
   };
   const BOSSES = [
-    { id: 'wall', name: '高墙', desc: '目标分 ×2', targetMult: 2 },
-    { id: 'water', name: '深水', desc: '没有弃牌', discards: 0 },
-    { id: 'manacle', name: '镣铐', desc: '手牌上限 -1', handSize: -1 },
-    { id: 'flint', name: '燧石', desc: '牌型基础筹码和倍率减半', halve: true },
-    { id: 'club', name: '梅花之咒', desc: '梅花牌不计分', debuff: 'c' },
-    { id: 'heart', name: '红心之咒', desc: '红心牌不计分', debuff: 'h' },
-    { id: 'needle', name: '独针', desc: '只能出 1 手，但目标只有一半', hands: 1, targetMult: 0.5 },
+    { id: 'wall', name: '高墙', desc: '恶魔的牌 ×1.5', devilMult: 1.5 },
+    { id: 'manacle', name: '镣铐', desc: '你的手牌上限 -1', handSize: -1 },
+    { id: 'flint', name: '燧石', desc: '你的牌型基础筹码和倍率减半', halve: true },
+    { id: 'club', name: '梅花之咒', desc: '你的梅花牌不计分', debuff: 'c' },
+    { id: 'heart', name: '红心之咒', desc: '你的红心牌不计分', debuff: 'h' },
+    { id: 'dark', name: '暗牌', desc: '恶魔的牌扣着出，你看不到他这手多少分', hidden: true },
   ];
   const BLIND_NAMES = ['小盲注', '大盲注', 'Boss'];
 
-  function blindTarget(ante, idx, boss) {
-    const base = CONFIG.anteBase[Math.min(ante, CONFIG.antes) - 1];
-    return Math.round(base * CONFIG.blindMult[idx] * (idx === 2 && boss && boss.targetMult ? boss.targetMult : 1));
+  // both sides race to the same number; the blind and the boss change how hard the devil hits, not the target
+  function blindTarget(ante) { return CONFIG.target[Math.min(ante, CONFIG.antes) - 1]; }
+  function devilMult(ante, idx, boss) {
+    return CONFIG.devilPower[Math.min(ante, CONFIG.antes) - 1] * CONFIG.blindPower[idx] * (idx === 2 && boss && boss.devilMult ? boss.devilMult : 1);
   }
 
   function newRun(rng) {
     return {
       ante: 1, blind: 0, money: CONFIG.startMoney, jokers: [], levels: Object.fromEntries(HAND_ORDER.map((h) => [h, 1])),
-      plays: Object.fromEntries(HAND_ORDER.map((h) => [h, 0])), green: 0, planetsUsed: 0,
+      plays: Object.fromEntries(HAND_ORDER.map((h) => [h, 0])), planetsUsed: 0,
       gun: { chambers: [] }, // this ante's bullets in load order: { who: 'you'|'devil', live }
       boss: BOSSES[Math.floor(rng() * BOSSES.length)], alive: true, devilsKilled: 0, log: [],
     };
@@ -517,21 +524,58 @@ table.ht td:nth-child(n+2) { text-align: right; }
     return { type, name: h[0], chips, mult, total: Math.floor(chips * mult), steps, scoring };
   }
   // after a hand is played (mutates run counters)
-  function notePlayed(run, type) { run.plays[type]++; run.green++; }
-  function noteDiscard(run) { run.green = Math.max(0, run.green - 1); }
+  function notePlayed(run, type) { run.plays[type]++; }
 
   /* ───────────── blind lifecycle ───────────── */
   function startBlind(run, rng) {
     const idx = run.blind, boss = idx === 2 ? run.boss : null;
     return {
-      idx, boss, target: blindTarget(run.ante, idx, boss), score: 0,
-      hands: boss && boss.hands ? boss.hands : CONFIG.hands,
-      discards: boss && boss.discards === 0 ? 0 : CONFIG.discards,
+      idx, boss, target: blindTarget(run.ante), dm: devilMult(run.ante, idx, boss),
+      you: 0, devil: 0, turn: 0,
       handSize: CONFIG.handSize + (boss && boss.handSize ? boss.handSize : 0),
       deck: shuffle(makeDeck(), rng), hand: [],
+      ddeck: shuffle(makeDeck(), rng), dhand: [], rng,
     };
   }
-  function draw(b) { while (b.hand.length < b.handSize && b.deck.length) b.hand.push(b.deck.pop()); }
+  // when a deck runs out it is reshuffled from every card not in that hand
+  function refill(hand, rng) { const held = new Set(hand.map((c) => c.r + c.s)); return shuffle(makeDeck().filter((c) => !held.has(c.r + c.s)), rng); }
+  function draw(b) {
+    while (b.hand.length < b.handSize) { if (!b.deck.length) b.deck = refill(b.hand, b.rng); b.hand.push(b.deck.pop()); }
+    while (b.dhand.length < CONFIG.devilHandSize) { if (!b.ddeck.length) b.ddeck = refill(b.dhand, b.rng); b.dhand.push(b.ddeck.pop()); }
+  }
+  // the devil plays the best plain poker hand in his 8 cards, multiplied by his power
+  function devilBest(cards) {
+    let best = null;
+    const n = cards.length;
+    for (let m = 1; m < 1 << n; m++) {
+      let k = 0; for (let x = m; x; x &= x - 1) k++;
+      if (k > 5) continue;
+      const p = []; for (let i = 0; i < n; i++) if (m & (1 << i)) p.push(cards[i]);
+      const ev = evaluate(p), h = HANDS[ev.type];
+      const raw = (h[1] + ev.scoring.reduce((a, c) => a + cardChips(c), 0)) * h[2];
+      if (!best || raw > best.raw || (raw === best.raw && p.length < best.cards.length)) best = { raw, cards: p, type: ev.type, scoring: ev.scoring };
+    }
+    return best;
+  }
+  function devilTurn(b) {
+    const d = devilBest(b.dhand), h = HANDS[d.type];
+    const chips = h[1] + d.scoring.reduce((a, c) => a + cardChips(c), 0);
+    b.dhand = b.dhand.filter((c) => !d.cards.includes(c));
+    return { cards: d.cards, scoring: d.scoring, type: d.type, name: h[0], chips, mult: h[2], power: b.dm, total: Math.floor(d.raw * b.dm) };
+  }
+  // only the higher hand scores; a tie scores nothing
+  function resolveTurn(b, mine, dev) {
+    b.turn++;
+    const winner = mine > dev ? 'you' : dev > mine ? 'devil' : 'tie';
+    if (winner === 'you') b.you += mine; else if (winner === 'devil') b.devil += dev;
+    return winner;
+  }
+  function blindResult(b) {
+    if (b.you >= b.target) return 'you';
+    if (b.devil >= b.target) return 'devil';
+    if (b.turn >= CONFIG.maxTurns) return b.you > b.devil ? 'you' : 'devil';
+    return null;
+  }
 
   // The winner of each blind loads one bullet and chooses live or dud; the other side sees a bullet go in, not which.
   // The boss winner loads, spins and fires. Every live round counts, whoever loaded it: your live round can kill you.
@@ -553,20 +597,35 @@ table.ht td:nth-child(n+2) { text-align: right; }
   }
   // the devil only loads after you fail a blind. Boss win: always live. Otherwise he bets on you failing again.
   function devilLoadsLive(blindIdx, ratio, rng) { return blindIdx === 2 || rng() < (ratio < CONFIG.devilSureBelow ? CONFIG.devilLiveSure : CONFIG.devilLiveNear); }
-  // your firepower this blind (points per hand) projected onto this ante's boss: 1.0 = exactly enough
-  function projectBoss(run, score, handsUsed) {
-    const boss = run.boss, hands = boss.hands || CONFIG.hands;
-    return (score / Math.max(1, handsUsed)) * hands / blindTarget(run.ante, 2, boss);
+  // How likely are you to win this ante's boss, if your typical hand is myHand? The devil's raw hand strength is sampled once;
+  // a turn is a coin flip with p = P(devil raw × power < myHand); the blind is a race of needed wins on each side.
+  let DEVIL_RAW = null;
+  function devilRaw() {
+    if (DEVIL_RAW) return DEVIL_RAW;
+    let a = 7; const r = () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const out = []; for (let i = 0; i < 1500; i++) out.push(devilBest(shuffle(makeDeck(), r).slice(0, CONFIG.devilHandSize)).raw);
+    return (DEVIL_RAW = out.sort((x, y) => x - y));
+  }
+  function turnWinChance(myHand, dm) {
+    const d = devilRaw(), lim = myHand / dm;
+    let lo = 0, hi = d.length; while (lo < hi) { const m = (lo + hi) >> 1; if (d[m] < lim) lo = m + 1; else hi = m; }
+    return lo / d.length;
+  }
+  function raceWin(q, needYou, needDevil) {
+    let p = 0, c = 1; // c = C(needYou - 1 + f, f)
+    for (let f = 0; f < needDevil; f++) { if (f) c = (c * (needYou - 1 + f)) / f; p += c * Math.pow(q, needYou) * Math.pow(1 - q, f); }
+    return p;
+  }
+  function bossWinChance(run, myHand) {
+    const dm = devilMult(run.ante, 2, run.boss), target = blindTarget(run.ante), d = devilRaw();
+    const q = turnWinChance(myHand, dm);
+    const devilWinHand = d[Math.floor(d.length * 0.7)] * dm; // when the devil wins a turn his hand is usually a strong one
+    return raceWin(q, Math.max(1, Math.ceil(target / Math.max(1, myHand))), Math.max(1, Math.ceil(target / devilWinHand)));
   }
 
   function endBlindMoney(run, b, won) {
     const lines = [];
-    if (won) {
-      lines.push(['击败' + BLIND_NAMES[b.idx], CONFIG.blindReward[b.idx]]);
-      if (b.hands > 0) lines.push(['剩余出牌 ×' + b.hands, b.hands]);
-    }
-    const interest = Math.min(CONFIG.interestCap, Math.floor(run.money / CONFIG.interestPer));
-    if (interest) lines.push(['利息', interest]);
+    if (won) lines.push(['赢下' + BLIND_NAMES[b.idx], CONFIG.blindReward[b.idx]]);
     for (const j of run.jokers) { const d = JOKER_BY_ID[j]; if (d.endOfBlind) lines.push([d.name, d.endOfBlind()]); }
     const total = lines.reduce((s, l) => s + l[1], 0);
     run.money += total;
@@ -611,8 +670,8 @@ table.ht td:nth-child(n+2) { text-align: right; }
 
   const DL = {
     SUITS, SUIT_SYM, SUIT_NAME, rankLabel, cardChips, isFace, makeDeck, shuffle, HANDS, HAND_ORDER, evaluate, analyze, contains,
-    JOKERS, JOKER_BY_ID, PLANETS, CONFIG, BOSSES, BLIND_NAMES, blindTarget, newRun, score, notePlayed, noteDiscard,
-    startBlind, draw, loadBullet, killMoney, liveCount, hitChance, bossShot, devilLoadsLive, projectBoss, endBlindMoney, advance, rollShop, devilDrop, buy, sellValue,
+    JOKERS, JOKER_BY_ID, PLANETS, CONFIG, BOSSES, BLIND_NAMES, blindTarget, newRun, score, notePlayed,
+    startBlind, draw, devilTurn, resolveTurn, blindResult, devilMult, loadBullet, killMoney, liveCount, hitChance, bossShot, devilLoadsLive, turnWinChance, bossWinChance, endBlindMoney, advance, rollShop, devilDrop, buy, sellValue,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = DL; else root.DL = DL;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -951,8 +1010,21 @@ table.ht td:nth-child(n+2) { text-align: right; }
   function layoutPlayed() {
     const n = G.played.length;
     G.played.forEach((c, i) => {
-      C3(c).place(new THREE.Vector3((i - (n - 1) / 2) * (CW + (portrait ? 0.004 : 0.02)), 0.8 + i * 0.001, portrait ? 0.12 : -0.16), new THREE.Euler(-1.2, 0, 0), true);
+      C3(c).place(new THREE.Vector3((i - (n - 1) / 2) * (CW + (portrait ? 0.004 : 0.02)), 0.8 + i * 0.001, portrait ? 0.12 : -0.1), new THREE.Euler(-1.2, 0, 0), true);
     });
+  }
+  // the devil's 8 cards fan out face down in front of him; the hand he plays lies face up on his side of the felt
+  function layoutDevil() {
+    const b = G.b; if (!b) return;
+    const n = b.dhand.length;
+    b.dhand.forEach((c, i) => {
+      const o = C3(c), off = i - (n - 1) / 2;
+      o.place(new THREE.Vector3(off * 0.05, 0.9 - Math.abs(off) * 0.004, -1.08), new THREE.Euler(-0.35, Math.PI, -off * 0.07), true);
+    });
+    if (G.dev) {
+      const m = G.dev.cards.length, hidden = b.boss && b.boss.hidden && !G.devShown;
+      G.dev.cards.forEach((c, i) => C3(c).place(new THREE.Vector3((i - (m - 1) / 2) * (CW + 0.015), 0.795 + i * 0.001, portrait ? -0.32 : -0.52), new THREE.Euler(-1.35, 0, 0), !hidden));
+    }
   }
 
   /* ═════════ HUD ═════════ */
@@ -1004,18 +1076,19 @@ table.ht td:nth-child(n+2) { text-align: right; }
     $('blindLbl').textContent = boss ? `Boss · ${run.boss.name}` : DL.BLIND_NAMES[run.blind];
     $('blindLbl').className = boss ? 'boss' : '';
     $('bossLbl').hidden = !boss; $('bossLbl').textContent = boss ? run.boss.desc : '';
+    $('anteR').textContent = `${Math.min(run.ante, CFG.antes)}/${CFG.antes}`;
     if (b) {
       $('targetLbl').textContent = fmt(b.target);
-      $('scoreNow').textContent = fmt(b.score);
-      $('scoreBar').style.width = `${Math.min(100, b.score / b.target * 100)}%`;
-      $('handsLbl').textContent = b.hands; $('discLbl').textContent = b.discards;
+      $('turnLbl').textContent = `回合 ${Math.min(b.turn + 1, CFG.maxTurns)}/${CFG.maxTurns}`;
+      $('scoreNow').textContent = fmt(b.you); $('devNow').textContent = fmt(b.devil);
+      $('scoreBar').style.width = `${Math.min(100, b.you / b.target * 100)}%`;
+      $('devBar').style.width = `${Math.min(100, b.devil / b.target * 100)}%`;
       $('deckLbl').textContent = `牌堆 ${b.deck.length}`;
     }
     $('money').textContent = `$${run.money}`;
     renderCyl();
     const can = G.phase === 'play' && !G.busy, n = G.sel.size;
-    $('playBtn').disabled = !can || n < 1 || n > 5 || !b || b.hands <= 0;
-    $('discBtn').disabled = !can || n < 1 || !b || b.discards <= 0;
+    $('playBtn').disabled = !can || n < 1 || n > 5 || !b;
     $('sortBtn').textContent = G.sortBy === 'rank' ? '按点数' : '按花色';
     preview();
   }
@@ -1028,8 +1101,10 @@ table.ht td:nth-child(n+2) { text-align: right; }
     $('handName').className = '';
     $('handName').innerHTML = `${s.name}<small>Lv.${G.run.levels[s.type]}</small>`;
     $('chipsV').textContent = fmt(s.steps[0].chips); $('multV').textContent = fmt(s.steps[0].mult);
-    const need = G.b.target - G.b.score;
-    $('est').innerHTML = `预计 ${fmt(s.total)}${s.total >= need ? ' · <b>够了</b>' : ''}`;
+    const d = G.dev, hidden = G.b.boss && G.b.boss.hidden;
+    $('est').innerHTML = !d ? `预计 ${fmt(s.total)}` : hidden ? `预计 ${fmt(s.total)} · 恶魔的分数看不到`
+      : s.total > d.total ? `${fmt(s.total)} vs ${fmt(d.total)} · <b style="color:var(--green)">能赢</b>`
+      : `${fmt(s.total)} vs ${fmt(d.total)} · <em>打不过</em>，丢烂牌吧`;
   }
 
   let sayT = 0;
@@ -1063,6 +1138,8 @@ table.ht td:nth-child(n+2) { text-align: right; }
     devilAim: ['把头抬起来。', '别眨眼。', '轮到我了。'],
     miss: ['咔。哈哈哈哈！', '空的？可惜啊。'],
     spared: ['运气好而已。', '下一枪就没这么幸运了。'],
+    devPlay: ['我先来。', '看好了。', '这手怎么样？'],
+    devStrong: ['这手你接得住吗？', '哈。跟上啊。', '打不过就认输吧。'],
     devilLoad: ['这一发……你猜？', '我装好了。是什么呢？', '嘘。'],
     revive: ['我回来了。你以为能杀死我？', '……那只是一具身体。', '我们继续。'],
   };
@@ -1095,7 +1172,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
   async function startRun() {
     A();
     G.run = DL.newRun(rng);
-    G.stats = { best: 0, bestName: '', hands: 0, kills: 0, won: 0, lost: 0, shots: [], finalWin: false };
+    G.stats = { turnsWon: 0, best: 0, bestName: '', hands: 0, kills: 0, won: 0, lost: 0, shots: [], finalWin: false };
     G.cham = G.run.gun.chambers; G.reveal = false; setHoles();
     for (const o of cards3d.values()) o.dispose(); cards3d.clear();
     clearFlyers(); casings.forEach((c) => scene.remove(c)); casings.length = 0;
@@ -1112,7 +1189,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
     G.b = DL.startBlind(run, rng);
     G.sel.clear(); G.played = []; G.phase = 'intro'; G.busy = true;
     coinWant = COINS;
-    G.b.used = 0;
+    G.b.bests = []; G.dev = null;
     hud();
     const boss = G.b.idx === 2;
     if (boss) {
@@ -1126,44 +1203,51 @@ table.ht td:nth-child(n+2) { text-align: right; }
     camHome();
     if (boss) await hint('boss', `<b>Boss 关</b>结束后会开枪：<b>这关赢</b>，你装弹后开枪；<em>这关输</em>，恶魔装弹后开枪。<br>命中率 = 枪里的实弹数 / 6，<em>你自己装的实弹也算</em>。`);
     await drawUp();
+    await devilPlays();
+    if (run.ante === 1 && G.b.idx === 0) hint('play', `<em>恶魔先出了一手</em>，分数在左上角。<br>点你的手牌选 1–5 张凑牌型，比他大就能把你的分加到进度上。<br>谁先到 <b>${fmt(G.b.target)}</b> 分谁赢下这一关。`);
+  }
+
+  // the devil picks his hand from his 8 cards and lays it on the felt (face down against the 暗牌 boss)
+  async function devilPlays() {
+    const b = G.b;
+    G.dev = DL.devilTurn(b); G.devShown = false;
+    b.bests.push(bestTotal());
+    layoutDevil(); SFX.card();
+    const hidden = b.boss && b.boss.hidden;
+    showDevHand(hidden);
+    if (!hidden && G.dev.total > bestTotal() && Math.random() < 0.6) say(pick('devStrong'), 1800);
+    else if (Math.random() < 0.25) say(pick('devPlay'), 1600);
+    await wait(500);
     G.phase = 'play'; G.busy = false; hud();
-    if (run.ante === 1 && G.b.idx === 0) hint('play', `点手牌选 1–5 张，凑德州牌型（对子、两对、三条、顺子、同花……）。<br>分数 = <i class="c">筹码</i> × <i class="m">倍率</i>。累计到<b>目标分</b>就赢下这一关。`);
+    if (!hidden && G.dev.total >= bestTotal() && !G.hints.has('dump') && G.hints.has('play')) hint('dump', `这回合你<em>打不过</em>恶魔。<br>没关系：选几张<b>用不上的烂牌</b>打出去，把对子、同花这些好牌留到下回合。`);
+  }
+  function showDevHand(hidden) {
+    const d = G.dev, el = $('devHand');
+    el.innerHTML = !d ? '—' : hidden ? '扣着的牌 · <b>?</b>' : `${d.name} ${fmt(d.chips)}×${d.mult}×<em>${+d.power.toFixed(2)}</em> = <b style="color:#ff7466">${fmt(d.total)}</b>`;
+    bump(el);
   }
 
   async function drawUp() {
     const b = G.b, before = new Set(b.hand.map((c) => c.id));
     DL.draw(b); sortHand();
+    for (const c of b.dhand) if (!cards3d.has(c.id)) C3(c).place(new THREE.Vector3(0, 1.0, -1.3), new THREE.Euler(-0.35, Math.PI, 0), true, true);
     const fresh = b.hand.filter((c) => !before.has(c.id));
     G.pending = new Set(fresh.map((c) => c.id));
     for (const c of fresh) C3(c).place(DECK_POS, DECK_ROT, false, true);
     for (const c of fresh) { G.pending.delete(c.id); layoutHand(); SFX.card(); await wait(55); }
     G.pending = null;
-    layoutHand(); hud();
-  }
-
-  async function discard() {
-    const b = G.b, sel = [...G.sel];
-    if (!sel.length || b.discards <= 0 || G.busy) return;
-    G.busy = true; hideHint();
-    b.discards--; DL.noteDiscard(G.run);
-    b.hand = b.hand.filter((c) => !G.sel.has(c)); G.sel.clear();
-    sel.forEach((c, i) => setTimeout(() => trash(c, 1), i * 50));
-    SFX.card(); hud(); renderJokers();
-    await wait(300);
-    await drawUp();
-    G.busy = false; hud();
+    layoutHand(); layoutDevil(); hud();
   }
 
   async function play() {
     const run = G.run, b = G.b, sel = [...G.sel];
-    if (!sel.length || sel.length > 5 || b.hands <= 0 || G.busy) return;
+    if (!sel.length || sel.length > 5 || G.busy || !G.dev) return;
     G.busy = true; G.phase = 'score'; hideHint();
     // keep the hand order for the played row
     const played = b.hand.filter((c) => G.sel.has(c));
     const held = b.hand.filter((c) => !G.sel.has(c));
     const res = DL.score(run, played, held, b.idx === 2 ? b.boss : null);
     b.hand = held; G.sel.clear(); G.played = played;
-    b.hands--; b.used++;
     hud(); layoutHand(); layoutPlayed(); SFX.card();
     $('est').textContent = ''; $('handName').className = '';
     $('handName').innerHTML = `${res.name}<small>Lv.${run.levels[res.type]}</small>`;
@@ -1193,36 +1277,52 @@ table.ht td:nth-child(n+2) { text-align: right; }
       i++;
       await wait(st.kind === 'base' ? 380 : d);
     }
-    // final total
-    const total = res.total, need = b.target - b.score, frac = Math.min(1, total / b.target);
+    // final total, then the reveal: only the higher hand scores
+    const total = res.total, dev = G.dev;
     $('est').innerHTML = `= <b>${fmt(total)}</b>`;
-    popAt(new THREE.Vector3(0, 0.98, portrait ? 0.12 : -0.16), fmt(total), 'g big');
-    SFX.total(frac > 0.4); shake = Math.max(shake, 0.15 + frac * 0.5);
-    await wait(520);
-    // the devil bleeds gold as you close in on the target
-    const before = b.score;
-    b.score += total;
+    popAt(new THREE.Vector3(0, 0.98, portrait ? 0.12 : -0.1), fmt(total), 'g big');
+    SFX.total(total > dev.total); 
     G.stats.hands++;
     if (total > G.stats.best) { G.stats.best = total; G.stats.bestName = res.name; }
     DL.notePlayed(run, res.type);
-    const lost = Math.round(COINS * (Math.min(b.score, b.target) - Math.min(before, b.target)) / b.target);
-    coinWant = Math.round(COINS * Math.max(0, 1 - b.score / b.target));
-    burstCoins(Math.min(45, Math.max(3, lost)), new THREE.Vector3(0, 1.15, -1.3)); SFX.coins(lost);
-    dv.flinch = Math.min(1, 0.3 + frac);
-    if (frac > 0.35) say(pick('big'), 1800); else if (frac < 0.12 && Math.random() < 0.5) say(pick('small'), 1500);
-    // roll the score counter
-    const sEl = $('scoreNow');
-    await tween(450, (k) => { sEl.textContent = fmt(before + total * k); $('scoreBar').style.width = `${Math.min(100, (before + total * k) / b.target * 100)}%`; });
-    bump(sEl);
+    await wait(500);
+    if (b.boss && b.boss.hidden) { G.devShown = true; layoutDevil(); showDevHand(false); SFX.card(); await wait(600); }
+    const before = { you: b.you, devil: b.devil };
+    const w = DL.resolveTurn(b, total, dev.total);
+    const devPos = new THREE.Vector3(0, 0.98, portrait ? -0.32 : -0.52);
+    if (w === 'you') {
+      G.stats.turnsWon++;
+      banner('<span style="font-size:.6em">这回合</span> <b>你赢</b>', `${fmt(total)} > ${fmt(dev.total)}`, '');
+      const lost = Math.round(COINS * (Math.min(b.you, b.target) - Math.min(before.you, b.target)) / b.target);
+      coinWant = Math.round(COINS * Math.max(0, 1 - b.you / b.target));
+      burstCoins(Math.min(45, Math.max(4, lost)), new THREE.Vector3(0, 1.15, -1.3)); SFX.coins(lost);
+      dv.flinch = Math.min(1, 0.4 + total / b.target);
+      if (total / b.target > 0.3) say(pick('big'), 1600);
+      dev.cards.forEach((c) => { const o = cards3d.get(c.id); if (o) o.front.material.color.setRGB(0.45, 0.45, 0.45); });
+    } else if (w === 'devil') {
+      banner('<span style="font-size:.6em">这回合</span> <em>恶魔赢</em>', `${fmt(dev.total)} > ${fmt(total)}`, '');
+      popAt(devPos, `+${fmt(dev.total)}`, 'm big');
+      dv.laugh = 0.7; SFX.laugh();
+      played.forEach((c) => { const o = cards3d.get(c.id); if (o) o.front.material.color.setRGB(0.45, 0.45, 0.45); });
+      eyeLight.intensity = 2 + 3 * b.devil / b.target;
+    } else banner('平局', '谁都不得分', 'var(--dim)');
+    await tween(450, (k) => {
+      const y = before.you + (b.you - before.you) * k, d = before.devil + (b.devil - before.devil) * k;
+      $('scoreNow').textContent = fmt(y); $('devNow').textContent = fmt(d);
+      $('scoreBar').style.width = `${Math.min(100, y / b.target * 100)}%`; $('devBar').style.width = `${Math.min(100, d / b.target * 100)}%`;
+    });
+    bump(w === 'devil' ? $('devNow') : $('scoreNow'));
     renderJokers();
-    await wait(380);
+    await wait(650);
+    banner('');
     played.forEach((c, k) => setTimeout(() => trash(c, 1), k * 45));
-    G.played = [];
+    dev.cards.forEach((c, k) => setTimeout(() => trash(c, -1), k * 45));
+    G.played = []; G.dev = null; showDevHand(false);
     await wait(260);
-    if (b.score >= b.target) return endBlind(true);
-    if (b.hands <= 0) return endBlind(false);
+    const result = DL.blindResult(b);
+    if (result) return endBlind(result === 'you');
     await drawUp();
-    G.phase = 'play'; G.busy = false; hud();
+    await devilPlays();
   }
 
   /* ─── end of a blind: load → (boss) shoot → cash out → shop ─── */
@@ -1233,8 +1333,10 @@ table.ht td:nth-child(n+2) { text-align: right; }
     if (run.ante === CFG.antes && b.idx === 2 && won) G.stats.finalWin = true;
     // sweep remaining hand
     b.hand.forEach((c, k) => setTimeout(() => trash(c, -1), k * 40));
-    if (won) { SFX.win(); banner('过关！', `${fmt(b.score)} / ${fmt(b.target)}`, 'var(--gold)'); say(pick('youWin')); }
-    else { SFX.lose(); banner('没打到', `${fmt(b.score)} / ${fmt(b.target)}　差 ${Math.round((1 - b.score / b.target) * 100)}%<br>这一关算恶魔赢`, 'var(--blood)'); say(pick('devilWin')); dv.laugh = 1; SFX.laugh(); }
+    b.dhand.forEach((c, k) => setTimeout(() => trash(c, 1), k * 40));
+    eyeLight.intensity = 0.6;
+    if (won) { SFX.win(); banner('赢下这一关！', `你 ${fmt(b.you)} : 恶魔 ${fmt(b.devil)}`, 'var(--gold)'); say(pick('youWin')); }
+    else { SFX.lose(); banner('恶魔先到了', `你 ${fmt(b.you)} : 恶魔 ${fmt(b.devil)}　你到了目标的 ${Math.round(b.you / b.target * 100)}%`, 'var(--blood)'); say(pick('devilWin')); dv.laugh = 1; SFX.laugh(); }
     await wait(1500);
     banner('');
     await loadBullet(won);
@@ -1260,7 +1362,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
     await swing(true);
     let want;
     if (won) want = await chooseLoad();
-    else { want = DL.devilLoadsLive(b.idx, b.score / b.target, rng); say(pick('devilLoad')); }
+    else { want = DL.devilLoadsLive(b.idx, b.you / b.target, rng); say(pick('devilLoad')); }
     const live = DL.loadBullet(run, won, want);
     if (won && !live) { hud(); bump($('money')); SFX.coins(3); }
     const bullet = new THREE.Mesh(bulletGeo, won ? (live ? bulletMat.you : bulletMat.dud) : bulletMat.devil); scene.add(bullet);
@@ -1434,9 +1536,8 @@ table.ht td:nth-child(n+2) { text-align: right; }
     let info;
     if (boss) info = `你赢下了 Boss，装完这发就<b>由你开枪</b>。<br>${gunNow}`;
     else {
-      const proj = DL.projectBoss(run, b.score, b.used);
-      const pct = Math.round(proj * 100);
-      info = `你赢下了${DL.BLIND_NAMES[b.idx]}。按这关的火力（平均每手 ${fmt(b.score / Math.max(1, b.used))}），这个底注的 Boss「${run.boss.name}」你大约能打到目标的 <b style="color:${pct >= 130 ? 'var(--green)' : pct >= 100 ? 'var(--gold)' : 'var(--blood)'}">${pct}%</b>。<br>${gunNow}`;
+      const pct = Math.round(b.bests.reduce((t, h) => t + DL.bossWinChance(run, h), 0) / Math.max(1, b.bests.length) * 100);
+      info = `你赢下了${DL.BLIND_NAMES[b.idx]}。按你这关每回合的牌力，这个底注的 Boss「${run.boss.name}」（恶魔力量 ×${+DL.devilMult(run.ante, 2, run.boss).toFixed(2)}）你的胜率大约 <b style="color:${pct >= 75 ? 'var(--green)' : pct >= 45 ? 'var(--gold)' : 'var(--blood)'}">${pct}%</b>。<br>${gunNow}`;
     }
     $('loadTtl').textContent = '装弹 · 实弹还是哑弹？';
     $('loadInfo').innerHTML = info;
@@ -1536,6 +1637,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
     $('endStats').innerHTML = [
       ['到达', run.ante > CFG.antes ? '全部 8 个底注' : `底注 ${run.ante} · ${DL.BLIND_NAMES[run.blind]}`],
       ['赢下的关', `${s.won} / ${s.won + s.lost}`],
+      ['赢下的回合', `${s.turnsWon} / ${s.hands}`],
       ['击倒恶魔', `${s.kills} 次`],
       ['开枪', `你 ${s.shots.filter((x) => x.shooter === 'you').length} · 恶魔 ${s.shots.filter((x) => x.shooter === 'devil').length}`],
       ['最高一手', s.best ? `${fmt(s.best)}（${s.bestName}）` : '—'],
@@ -1591,7 +1693,6 @@ table.ht td:nth-child(n+2) { text-align: right; }
     if (c !== G.hover) { G.hover = c; layoutHand(); canvas.style.cursor = c ? 'pointer' : ''; }
   });
   $('playBtn').onclick = play;
-  $('discBtn').onclick = discard;
   $('sortBtn').onclick = () => { G.sortBy = G.sortBy === 'rank' ? 'suit' : 'rank'; sortHand(); layoutHand(); hud(); };
   $('startBtn').onclick = startRun;
   $('againBtn').onclick = startRun;
@@ -1608,7 +1709,6 @@ table.ht td:nth-child(n+2) { text-align: right; }
   window.addEventListener('keydown', (e) => {
     if (G.phase !== 'play') return;
     if (e.key === 'Enter') play();
-    if (e.key === 'Backspace' || e.key === 'd') discard();
   });
   window.addEventListener('resize', resize);
 
@@ -1669,8 +1769,10 @@ table.ht td:nth-child(n+2) { text-align: right; }
   requestAnimationFrame(frame);
 
   // test hooks: speed up, inspect, and auto-play with the simulator's greedy search
+  function bestTotal() { const p = bestPlay(); return p ? p.total : 0; }
   function bestPlay() {
     const h = handNow(), boss = G.b.idx === 2 ? G.b.boss : null;
+    if (!h.length) return null;
     let best = null;
     const n = h.length;
     for (let mask = 1; mask < 1 << n; mask++) {
@@ -1680,14 +1782,14 @@ table.ht td:nth-child(n+2) { text-align: right; }
       const s = DL.score(G.run, p, held, boss, true);
       if (!best || s.total > best.total) best = { total: s.total, p };
     }
-    return best.p;
+    return best;
   }
   window.__T = {
     G, DL,
     autoLoad(f) { G.autoLoad = f; },
     speed(s) { SPEED = s; },
-    selectBest() { G.sel = new Set(bestPlay()); layoutHand(); hud(); },
-    play, discard,
+    selectBest() { G.sel = new Set(bestPlay().p); layoutHand(); hud(); },
+    play,
   };
 })();
 
