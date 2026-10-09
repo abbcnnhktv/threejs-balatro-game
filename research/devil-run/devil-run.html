@@ -119,6 +119,7 @@ button:focus-visible { outline: 1px dotted var(--gold); outline-offset: 3px; }
 #say { position: fixed; left: 50%; top: calc(108px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); z-index: 6; max-width: min(520px, 92vw); pointer-events: none; transition: opacity 0.25s steps(3); display: flex; gap: 8px; align-items: baseline; padding: 6px 12px 7px; }
 #say .who { color: var(--blood); font-size: 13px; white-space: nowrap; }
 #sayTxt { font-size: 16px; }
+#devTag { position: fixed; z-index: 4; transform: translate(-50%, -100%); padding: 3px 10px 4px; font-size: 15px; white-space: nowrap; pointer-events: none; }
 #banner { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); z-index: 7; text-align: center; pointer-events: none; display: grid; gap: 6px; width: min(720px, 94vw); }
 #banner .big { font-size: clamp(36px, 7vw, 64px); line-height: 1.1; letter-spacing: 0.12em; text-shadow: 3px 3px 0 #000, 6px 6px 0 rgba(0,0,0,.45); }
 #banner .sm { font-size: 17px; line-height: 1.6; }
@@ -254,6 +255,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
   </div>
   <div id="deckLbl" class="num">牌堆 44</div>
 </div>
+<div id="devTag" class="win" hidden></div>
 <div id="say" class="win" style="opacity:0"><span class="who">恶魔</span><span id="sayTxt"></span></div>
 <div id="banner" hidden><div class="big" id="bnBig"></div><div class="sm" id="bnSm"></div></div>
 <div id="cash" class="win" hidden></div>
@@ -467,6 +469,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
     blindReward: [3, 4, 5],
     handSize: 8, devilHandSize: 8, maxTurns: 14, jokerSlots: 5, startMoney: 4,
     shopJokers: 2, shopPlanets: 2, rerollBase: 3,
+    discards: 0, interestPer: 0, interestCap: 5, // both off in v3; kept switchable for the comparison runs
     chambers: 6,
     devilKillMoney: 8, bountyPerLive: 4, dudCost: 3,
     devilSureBelow: 0.75, devilLiveSure: 0.7, devilLiveNear: 0.4,
@@ -531,7 +534,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
     const idx = run.blind, boss = idx === 2 ? run.boss : null;
     return {
       idx, boss, target: blindTarget(run.ante), dm: devilMult(run.ante, idx, boss),
-      you: 0, devil: 0, turn: 0,
+      you: 0, devil: 0, turn: 0, discards: CONFIG.discards,
       handSize: CONFIG.handSize + (boss && boss.handSize ? boss.handSize : 0),
       deck: shuffle(makeDeck(), rng), hand: [],
       ddeck: shuffle(makeDeck(), rng), dhand: [], rng,
@@ -626,6 +629,8 @@ table.ht td:nth-child(n+2) { text-align: right; }
   function endBlindMoney(run, b, won) {
     const lines = [];
     if (won) lines.push(['赢下' + BLIND_NAMES[b.idx], CONFIG.blindReward[b.idx]]);
+    const interest = CONFIG.interestPer ? Math.min(CONFIG.interestCap, Math.floor(run.money / CONFIG.interestPer)) : 0;
+    if (interest) lines.push(['利息', interest]);
     for (const j of run.jokers) { const d = JOKER_BY_ID[j]; if (d.endOfBlind) lines.push([d.name, d.endOfBlind()]); }
     const total = lines.reduce((s, l) => s + l[1], 0);
     run.money += total;
@@ -801,6 +806,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
     snapU.value.set(lowW / 2, lowH / 2);
     camera.aspect = w / h;
     portrait = w / h < 0.9;
+    DEV_ROW.set(0, 0.9, portrait ? -0.3 : -0.42);
     camera.fov = portrait ? 78 : 52;
     CAM_HOME.pos.set(0, portrait ? 1.6 : 1.42, portrait ? 1.42 : 1.22);
     CAM_HOME.look.set(0, portrait ? 0.92 : 0.96, -0.55);
@@ -1014,16 +1020,18 @@ table.ht td:nth-child(n+2) { text-align: right; }
     });
   }
   // the devil's 8 cards fan out face down in front of him; the hand he plays lies face up on his side of the felt
+  // the devil's hand stands up on his side, big and angled at you so it reads at PS1 resolution
+  const DEV_SCALE = 1.3, DEV_ROW = new THREE.Vector3(0, 0.9, -0.42);
   function layoutDevil() {
     const b = G.b; if (!b) return;
     const n = b.dhand.length;
     b.dhand.forEach((c, i) => {
       const o = C3(c), off = i - (n - 1) / 2;
-      o.place(new THREE.Vector3(off * 0.05, 0.9 - Math.abs(off) * 0.004, -1.08), new THREE.Euler(-0.35, Math.PI, -off * 0.07), true);
+      o.root.scale.setScalar(0.75); o.place(new THREE.Vector3(off * 0.04, 0.88 - Math.abs(off) * 0.003, -1.02), new THREE.Euler(-0.5, Math.PI, -off * 0.08), true);
     });
     if (G.dev) {
       const m = G.dev.cards.length, hidden = b.boss && b.boss.hidden && !G.devShown;
-      G.dev.cards.forEach((c, i) => C3(c).place(new THREE.Vector3((i - (m - 1) / 2) * (CW + 0.015), 0.795 + i * 0.001, portrait ? -0.32 : -0.52), new THREE.Euler(-1.35, 0, 0), !hidden));
+      G.dev.cards.forEach((c, i) => { const o = C3(c); o.root.scale.setScalar(DEV_SCALE); o.place(new THREE.Vector3((i - (m - 1) / 2) * (CW * DEV_SCALE + 0.012), DEV_ROW.y, DEV_ROW.z), new THREE.Euler(-0.5, 0, 0), !hidden); });
     }
   }
 
@@ -1222,7 +1230,10 @@ table.ht td:nth-child(n+2) { text-align: right; }
     if (!hidden && G.dev.total >= bestTotal() && !G.hints.has('dump') && G.hints.has('play')) hint('dump', `这回合你<em>打不过</em>恶魔。<br>没关系：选几张<b>用不上的烂牌</b>打出去，把对子、同花这些好牌留到下回合。`);
   }
   function showDevHand(hidden) {
-    const d = G.dev, el = $('devHand');
+    const d = G.dev, tag = $('devTag');
+    tag.hidden = !d;
+    if (d) tag.innerHTML = hidden ? '恶魔 · <b>?</b>' : `恶魔 · ${d.name} <b style="color:#ff7466">${fmt(d.total)}</b>`;
+    const el = $('devHand');
     el.innerHTML = !d ? '—' : hidden ? '扣着的牌 · <b>?</b>' : `${d.name} ${fmt(d.chips)}×${d.mult}×<em>${+d.power.toFixed(2)}</em> = <b style="color:#ff7466">${fmt(d.total)}</b>`;
     bump(el);
   }
@@ -1289,7 +1300,8 @@ table.ht td:nth-child(n+2) { text-align: right; }
     if (b.boss && b.boss.hidden) { G.devShown = true; layoutDevil(); showDevHand(false); SFX.card(); await wait(600); }
     const before = { you: b.you, devil: b.devil };
     const w = DL.resolveTurn(b, total, dev.total);
-    const devPos = new THREE.Vector3(0, 0.98, portrait ? -0.32 : -0.52);
+    $('banner').style.top = '19%';
+    const devPos = DEV_ROW.clone().add(new THREE.Vector3(0, 0.16, 0));
     if (w === 'you') {
       G.stats.turnsWon++;
       banner('<span style="font-size:.6em">这回合</span> <b>你赢</b>', `${fmt(total)} > ${fmt(dev.total)}`, '');
@@ -1314,10 +1326,11 @@ table.ht td:nth-child(n+2) { text-align: right; }
     bump(w === 'devil' ? $('devNow') : $('scoreNow'));
     renderJokers();
     await wait(650);
-    banner('');
+    banner(''); $('banner').style.top = '';
     played.forEach((c, k) => setTimeout(() => trash(c, 1), k * 45));
     dev.cards.forEach((c, k) => setTimeout(() => trash(c, -1), k * 45));
     G.played = []; G.dev = null; showDevHand(false);
+    for (const o of cards3d.values()) o.root.scale.setScalar(1);
     await wait(260);
     const result = DL.blindResult(b);
     if (result) return endBlind(result === 'you');
@@ -1732,6 +1745,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
       if (f.m.position.y < -1) f.rest = true;
     }
     // coins on the coat drain toward what's left of the target
+    if (G.dev && !$('devTag').hidden) { const q = projectEl(DEV_ROW.clone().add(new THREE.Vector3(0, 0.15 * DEV_SCALE, 0))); $('devTag').style.left = `${q.x}px`; $('devTag').style.top = `${q.y}px`; }
     if (G.phase === 'title') coinWant = COINS;
     coinShown += (coinWant - coinShown) * (1 - Math.exp(-3 * dt));
     coinIM.count = Math.max(0, Math.round(coinShown));

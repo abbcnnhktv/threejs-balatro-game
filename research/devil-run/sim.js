@@ -103,7 +103,15 @@ function playBlind(run, tier, rng, S) {
   let won = 0, sumWin = 0, res; const bests = [];
   while (!(res = DL.blindResult(b))) {
     const d = DL.devilTurn(b);
-    const bp = bestPlay(run, b.hand, b.boss);
+    let bp = bestPlay(run, b.hand, b.boss);
+    // with discards: swap junk for fresh cards instead of giving up the turn
+    while (tier !== 'novice' && b.discards > 0 && !(b.boss && b.boss.hidden) && bp.total <= d.total) {
+      const keep = new Set(bp.played);
+      const toss = b.hand.filter((c) => !keep.has(c)).sort((x, y) => x.r - y.r).slice(0, 5);
+      if (!toss.length) break;
+      b.hand = b.hand.filter((c) => !toss.includes(c)); b.discards--; S.discards++; DL.draw(b);
+      bp = bestPlay(run, b.hand, b.boss);
+    }
     let play = bp.played, mine = bp.total; bests.push(bp.total);
     const hidden = b.boss && b.boss.hidden;
     if (!hidden && bp.total <= d.total && tier !== 'novice') {

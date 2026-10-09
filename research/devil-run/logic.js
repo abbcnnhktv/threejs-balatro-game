@@ -127,6 +127,7 @@
     blindReward: [3, 4, 5],
     handSize: 8, devilHandSize: 8, maxTurns: 14, jokerSlots: 5, startMoney: 4,
     shopJokers: 2, shopPlanets: 2, rerollBase: 3,
+    discards: 0, interestPer: 0, interestCap: 5, // both off in v3; kept switchable for the comparison runs
     chambers: 6,
     devilKillMoney: 8, bountyPerLive: 4, dudCost: 3,
     devilSureBelow: 0.75, devilLiveSure: 0.7, devilLiveNear: 0.4,
@@ -191,7 +192,7 @@
     const idx = run.blind, boss = idx === 2 ? run.boss : null;
     return {
       idx, boss, target: blindTarget(run.ante), dm: devilMult(run.ante, idx, boss),
-      you: 0, devil: 0, turn: 0,
+      you: 0, devil: 0, turn: 0, discards: CONFIG.discards,
       handSize: CONFIG.handSize + (boss && boss.handSize ? boss.handSize : 0),
       deck: shuffle(makeDeck(), rng), hand: [],
       ddeck: shuffle(makeDeck(), rng), dhand: [], rng,
@@ -286,6 +287,8 @@
   function endBlindMoney(run, b, won) {
     const lines = [];
     if (won) lines.push(['赢下' + BLIND_NAMES[b.idx], CONFIG.blindReward[b.idx]]);
+    const interest = CONFIG.interestPer ? Math.min(CONFIG.interestCap, Math.floor(run.money / CONFIG.interestPer)) : 0;
+    if (interest) lines.push(['利息', interest]);
     for (const j of run.jokers) { const d = JOKER_BY_ID[j]; if (d.endOfBlind) lines.push([d.name, d.endOfBlind()]); }
     const total = lines.reduce((s, l) => s + l[1], 0);
     run.money += total;

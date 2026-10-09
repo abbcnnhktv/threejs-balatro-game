@@ -1,0 +1,16 @@
+# v3 duel rules: what adding discards or interest back would do (600 runs per tier each)
+# reproduce: CFG='{}' / CFG='{"discards":2}' / CFG='{"interestPer":5}' OUT=/dev/null node par.js 600
+
+                       beat final boss   alive at end   turns/blind   turns won   close wins
+current (no discards, no interest)
+  novice                      2%             22%            6.5          57%          6%
+  average                    23%             59%            5.7          67%          5%
+  expert                     47%             72%            4.8          70%          4%
++2 discards per blind (used instead of giving up a lost turn; novices never discard)
+  novice                      2%             22%            6.5          57%          6%
+  average                    33%             68%            4.9          76%          3%
+  expert                     54%             80%            4.1          80%          2%
++interest ($1 per $5 held, max $5)
+  novice                      2%             21%            6.6          56%          7%
+  average                    25%             60%            5.8          66%          5%
+  expert                     59%             82%            4.3          74%          3%
