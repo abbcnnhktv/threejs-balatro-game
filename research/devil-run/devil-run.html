@@ -230,7 +230,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
     <div class="sp"><em>恶魔</em><span id="devNow" class="num">0</span></div>
     <div class="track dev"><i id="devBar"></i></div>
     <hr>
-    <div id="devRow"><span class="lbl">恶魔这手</span><div id="devHand">—</div></div>
+    <div id="devRow"><span class="lbl" id="devLbl">恶魔这手</span><div id="devHand">—</div></div>
     <hr>
     <div id="handRow">
       <div id="handName" class="lbl">选牌 · 最多 5 张</div>
@@ -1103,11 +1103,13 @@ table.ht td:nth-child(n+2) { text-align: right; }
   function preview() {
     if (G.phase !== 'play') return;
     const sel = [...G.sel];
-    if (!sel.length) { $('handName').innerHTML = '选牌 · 最多 5 张'; $('handName').className = 'lbl'; $('chipsV').textContent = '-'; $('multV').textContent = '-'; $('est').textContent = ''; return; }
+    if (!sel.length) { G.scoreIds = null; $('handName').innerHTML = '选牌 · 最多 5 张'; $('handName').className = 'lbl'; $('chipsV').textContent = '-'; $('multV').textContent = '-'; $('est').textContent = ''; return; }
     const held = handNow().filter((c) => !G.sel.has(c));
     const s = DL.score(G.run, sel, held, G.b.idx === 2 ? G.b.boss : null);
+    G.scoreIds = new Set(s.scoring.map((c) => c.id));
+    const dead = sel.length - s.scoring.length;
     $('handName').className = '';
-    $('handName').innerHTML = `${s.name}<small>Lv.${G.run.levels[s.type]}</small>`;
+    $('handName').innerHTML = `${s.name}<small>Lv.${G.run.levels[s.type]}${dead > 0 ? ` · <em>${dead} 张不计分</em>` : ''}</small>`;
     $('chipsV').textContent = fmt(s.steps[0].chips); $('multV').textContent = fmt(s.steps[0].mult);
     const d = G.dev, hidden = G.b.boss && G.b.boss.hidden;
     $('est').innerHTML = !d ? `预计 ${fmt(s.total)}` : hidden ? `预计 ${fmt(s.total)} · 恶魔的分数看不到`
@@ -1234,7 +1236,8 @@ table.ht td:nth-child(n+2) { text-align: right; }
     tag.hidden = !d;
     if (d) tag.innerHTML = hidden ? '恶魔 · <b>?</b>' : `恶魔 · ${d.name} <b style="color:#ff7466">${fmt(d.total)}</b>`;
     const el = $('devHand');
-    el.innerHTML = !d ? '—' : hidden ? '扣着的牌 · <b>?</b>' : `${d.name} ${fmt(d.chips)}×${d.mult}×<em>${+d.power.toFixed(2)}</em> = <b style="color:#ff7466">${fmt(d.total)}</b>`;
+    $('devLbl').textContent = G.b ? `恶魔这手 · 力量 ×${+G.b.dm.toFixed(2)}` : '恶魔这手';
+    el.innerHTML = !d ? '—' : hidden ? '扣着的牌 · <b>?</b>' : `${d.name} (${fmt(d.chips)}×${d.mult})×<em>${+d.power.toFixed(2)}</em> = <b style="color:#ff7466">${fmt(d.total)}</b>`;
     bump(el);
   }
 
@@ -1264,7 +1267,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
     $('handName').innerHTML = `${res.name}<small>Lv.${run.levels[res.type]}</small>`;
     await wait(420);
     const scoringIds = new Set(res.scoring.map((c) => c.id));
-    for (const c of played) if (!scoringIds.has(c.id)) { const o = C3(c); o.tp.y -= 0.01; o.front.material.color.setRGB(0.55, 0.55, 0.55); }
+    for (const c of played) if (!scoringIds.has(c.id)) { const o = C3(c); o.tp.y -= 0.01; o.front.material.color.setRGB(0.42, 0.42, 0.42); popAt(o.root.position.clone().add(new THREE.Vector3(0, 0.1, 0)), '不计分', 'n'); }
     let i = 0, prevChips = 0, prevMult = 0;
     const chipsEl = $('chipsV'), multEl = $('multV');
     for (const st of res.steps) {
@@ -1300,6 +1303,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
     if (b.boss && b.boss.hidden) { G.devShown = true; layoutDevil(); showDevHand(false); SFX.card(); await wait(600); }
     const before = { you: b.you, devil: b.devil };
     const w = DL.resolveTurn(b, total, dev.total);
+    $('est').innerHTML = w === 'you' ? `你 ${fmt(total)} > 恶魔 ${fmt(dev.total)} · <b style="color:var(--green)">你得分</b>` : w === 'devil' ? `你 ${fmt(total)} < 恶魔 ${fmt(dev.total)} · <em>恶魔得分</em>` : `都是 ${fmt(total)} · 平局，谁都不得分`;
     $('banner').style.top = '19%';
     const devPos = DEV_ROW.clone().add(new THREE.Vector3(0, 0.16, 0));
     if (w === 'you') {
@@ -1729,10 +1733,13 @@ table.ht td:nth-child(n+2) { text-align: right; }
   let last = performance.now(), t = 0;
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000); last = now; t += dt;
+    const handIds = new Set(G.b && G.phase === 'play' ? G.b.hand.map((c) => c.id) : []);
     for (const o of cards3d.values()) {
       o.update(dt, t);
-      const sel = G.sel.has(o.c) ? 0.18 + 0.08 * Math.sin(t * 6) : 0;
+      const picked = G.sel.has(o.c), scores = !G.scoreIds || G.scoreIds.has(o.c.id);
+      const sel = picked && scores ? 0.2 + 0.08 * Math.sin(t * 6) : 0;
       o.front.material.emissive.setRGB(sel, sel * 0.75, 0);
+      if (handIds.has(o.c.id)) { const k = picked && !scores ? 0.42 : 1; o.front.material.color.setRGB(k, k, k); }
     }
     for (const f of flyers) {
       if (f.rest) continue;
