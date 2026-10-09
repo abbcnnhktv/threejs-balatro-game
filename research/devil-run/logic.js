@@ -124,14 +124,15 @@
   /* ───────────── blinds, bosses, the revolver ───────────── */
   const CONFIG = {
     antes: 8,
-    anteBase: [300, 1100, 2500, 5000, 9800, 18000, 31000, 52000],
+    anteBase: [300, 1000, 2300, 4600, 9000, 16500, 28000, 47000],
     blindMult: [1, 1.5, 2],
     blindReward: [3, 4, 5],
     hands: 4, discards: 3, handSize: 8, jokerSlots: 5, startMoney: 4,
     interestPer: 5, interestCap: 5,
     shopJokers: 2, shopPlanets: 2, rerollBase: 4,
     chambers: 6,
-    devilKillMoney: 8,
+    devilKillMoney: 8, bountyPerLive: 4, dudCost: 3,
+    devilSureBelow: 0.75, devilLiveSure: 0.7, devilLiveNear: 0.4,
   };
   const BOSSES = [
     { id: 'wall', name: '高墙', desc: '目标分 ×2', targetMult: 2 },
@@ -153,7 +154,7 @@
     return {
       ante: 1, blind: 0, money: CONFIG.startMoney, jokers: [], levels: Object.fromEntries(HAND_ORDER.map((h) => [h, 1])),
       plays: Object.fromEntries(HAND_ORDER.map((h) => [h, 0])), green: 0, planetsUsed: 0,
-      gun: { you: 0, devil: 0 }, // bullets loaded this ante
+      gun: { chambers: [] }, // this ante's bullets in load order: { who: 'you'|'devil', live }
       boss: BOSSES[Math.floor(rng() * BOSSES.length)], alive: true, devilsKilled: 0, log: [],
     };
   }
@@ -202,14 +203,30 @@
   }
   function draw(b) { while (b.hand.length < b.handSize && b.deck.length) b.hand.push(b.deck.pop()); }
 
-  // the winner of each blind loads one of their own bullets; the boss winner loads, then fires
-  function loadBullet(run, youWon) { if (youWon) run.gun.you++; else run.gun.devil++; }
+  // The winner of each blind loads one bullet and chooses live or dud; the other side sees a bullet go in, not which.
+  // The boss winner loads, spins and fires. Every live round counts, whoever loaded it: your live round can kill you.
+  // a dud is insurance and costs money; a live round is free. You must load live if you can't pay.
+  function loadBullet(run, youWon, live) {
+    if (youWon && !live) { if (run.money < CONFIG.dudCost) live = true; else run.money -= CONFIG.dudCost; }
+    run.gun.chambers.push({ who: youWon ? 'you' : 'devil', live: !!live });
+    return !!live;
+  }
+  // killing the devil pays a bounty that grows with every live round in the gun
+  const killMoney = (shot) => CONFIG.devilKillMoney + CONFIG.bountyPerLive * shot.live;
+  const liveCount = (run) => run.gun.chambers.filter((c) => c.live).length;
   function hitChance(n) { return Math.min(1, n / CONFIG.chambers); }
   function bossShot(run, youWon, rng) {
-    const shooter = youWon ? 'you' : 'devil';
-    const p = hitChance(run.gun[shooter]);
+    const shooter = youWon ? 'you' : 'devil', live = liveCount(run);
+    const p = hitChance(live);
     const hit = rng() < p;
-    return { shooter, p, hit, bullets: { ...run.gun } };
+    return { shooter, p, hit, live, chambers: run.gun.chambers.map((c) => ({ ...c })) };
+  }
+  // the devil only loads after you fail a blind. Boss win: always live. Otherwise he bets on you failing again.
+  function devilLoadsLive(blindIdx, ratio, rng) { return blindIdx === 2 || rng() < (ratio < CONFIG.devilSureBelow ? CONFIG.devilLiveSure : CONFIG.devilLiveNear); }
+  // your firepower this blind (points per hand) projected onto this ante's boss: 1.0 = exactly enough
+  function projectBoss(run, score, handsUsed) {
+    const boss = run.boss, hands = boss.hands || CONFIG.hands;
+    return (score / Math.max(1, handsUsed)) * hands / blindTarget(run.ante, 2, boss);
   }
 
   function endBlindMoney(run, b, won) {
@@ -227,7 +244,7 @@
   }
   function advance(run, rng) {
     run.blind++;
-    if (run.blind > 2) { run.blind = 0; run.ante++; run.gun = { you: 0, devil: 0 }; run.boss = BOSSES[Math.floor(rng() * BOSSES.length)]; }
+    if (run.blind > 2) { run.blind = 0; run.ante++; run.gun = { chambers: [] }; run.boss = BOSSES[Math.floor(rng() * BOSSES.length)]; }
     return run.ante > CONFIG.antes ? 'victory' : 'next';
   }
 
@@ -265,7 +282,7 @@
   const DL = {
     SUITS, SUIT_SYM, SUIT_NAME, rankLabel, cardChips, isFace, makeDeck, shuffle, HANDS, HAND_ORDER, evaluate, analyze, contains,
     JOKERS, JOKER_BY_ID, PLANETS, CONFIG, BOSSES, BLIND_NAMES, blindTarget, newRun, score, notePlayed, noteDiscard,
-    startBlind, draw, loadBullet, hitChance, bossShot, endBlindMoney, advance, rollShop, devilDrop, buy, sellValue,
+    startBlind, draw, loadBullet, killMoney, liveCount, hitChance, bossShot, devilLoadsLive, projectBoss, endBlindMoney, advance, rollShop, devilDrop, buy, sellValue,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = DL; else root.DL = DL;
 })(typeof window !== 'undefined' ? window : globalThis);

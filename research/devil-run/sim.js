@@ -98,7 +98,7 @@ function shop(run, tier, rng, S) {
 function playBlind(run, tier, rng, S) {
   const b = DL.startBlind(run, rng);
   DL.draw(b);
-  let maxHand = 0;
+  let maxHand = 0, used = 0;
   while (b.hands > 0 && b.score < b.target) {
     const bp = bestPlay(run, b.hand, b.boss);
     const need = b.target - b.score;
@@ -118,10 +118,24 @@ function playBlind(run, tier, rng, S) {
       }
     }
     b.score += bp.total; maxHand = Math.max(maxHand, bp.total);
-    DL.notePlayed(run, bp.type); b.hands--; S.hands++;
+    DL.notePlayed(run, bp.type); b.hands--; S.hands++; used++;
     b.hand = b.hand.filter((c) => !bp.played.includes(c)); DL.draw(b);
   }
-  return { won: b.score >= b.target, ratio: b.score / b.target, target: b.target, maxHand, boss: b.boss };
+  return { won: b.score >= b.target, ratio: b.score / b.target, target: b.target, maxHand, boss: b.boss, score: b.score, used };
+}
+
+// live or dud? Live raises your kill chance if you win the boss, and your death chance if you lose it.
+function chooseLive(tier, run, res, rng) {
+  if (run.blind === 2) return true; // you are about to fire
+  const pol = process.env.POLICY;
+  if (pol === 'dud') return false;
+  if (pol === 'live') return true;
+  if (tier === 'novice') return rng() < 0.5;
+  const proj = DL.projectBoss(run, res.score, res.used);
+  const pWin = Math.max(0, Math.min(1, 0.5 + (proj - 1) * 1.2));
+  const th = +(process.env.TH || 0.75);
+  if (tier === 'average') return pWin + (rng() - 0.5) * 0.3 > th;
+  return pWin > th;
 }
 
 function playRun(tier, rng, S) {
@@ -130,14 +144,17 @@ function playRun(tier, rng, S) {
   while (true) {
     const res = playBlind(run, tier, rng, S);
     R.blinds.push({ ante: run.ante, idx: run.blind, won: res.won, ratio: res.ratio });
-    DL.loadBullet(run, res.won);
+    const live = res.won ? chooseLive(tier, run, res, rng) : DL.devilLoadsLive(run.blind, res.ratio, rng);
+    const loaded = DL.loadBullet(run, res.won, live);
+    S[(res.won ? 'you' : 'devil') + (loaded ? 'Live' : 'Dud')]++;
     if (run.ante === DL.CONFIG.antes && run.blind === 2 && res.won) R.finalWin = true;
     if (run.blind === 2) {
       const shot = DL.bossShot(run, res.won, rng);
-      S.shots[shot.shooter]++; S.bulletsAtShot[shot.shooter] += shot.bullets[shot.shooter];
+      S.shots[shot.shooter]++; S.bulletsAtShot[shot.shooter] += shot.live; if (shot.shooter === 'you') S.youShotP.push(shot.p);
+      S.ownLiveDeaths += shot.shooter === 'devil' && shot.hit && shot.chambers.some((c) => c.who === 'you' && c.live) ? 1 : 0;
       if (shot.shooter === 'devil') { S.devilShotP.push(shot.p); if (shot.hit) { R.died = true; R.ante = run.ante; return R; } }
       else if (shot.hit) {
-        R.kills++; S.kills++; run.money += DL.CONFIG.devilKillMoney;
+        R.kills++; S.kills++; run.money += DL.killMoney(shot);
         const drop = DL.devilDrop(run, rng);
         const pick = tier === 'novice' ? drop[0] : drop.reduce((a, j) => (STATIC[j] > STATIC[a] ? j : a), drop[0]);
         if (run.jokers.length < DL.CONFIG.jokerSlots) run.jokers.push(pick);
@@ -154,7 +171,7 @@ function playRun(tier, rng, S) {
 
 function runTier(tier, n, seed) {
   const rng = mulberry(seed);
-  const S = { hands: 0, discards: 0, planets: 0, jokersBought: 0, kills: 0, shots: { you: 0, devil: 0 }, bulletsAtShot: { you: 0, devil: 0 }, devilShotP: [] };
+  const S = { hands: 0, discards: 0, planets: 0, jokersBought: 0, kills: 0, shots: { you: 0, devil: 0 }, bulletsAtShot: { you: 0, devil: 0 }, devilShotP: [], youShotP: [], youLive: 0, youDud: 0, devilLive: 0, devilDud: 0, ownLiveDeaths: 0 };
   const runs = [];
   for (let i = 0; i < n; i++) runs.push(playRun(tier, rng, S));
   return { runs, S };
@@ -175,7 +192,7 @@ function report(label, out) {
   const classicWin = runs.filter((r) => r.blinds.length === 24 && r.blinds.every((b) => b.won)).length / n;
   const firstFail = Array(9).fill(0); runs.forEach((r) => { const f = r.blinds.find((b) => !b.won); if (f) firstFail[f.ante]++; });
   const med = (a) => { const s = a.slice().sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
-  return { label, n, win, finalWin, classicWin, classicDeath: firstFail.slice(1).map((d) => d / n), deathByAnte: deathByAnte.slice(1).map((d) => d / n), pass, nearMiss: near.near / Math.max(1, near.fail), medRatio: Object.fromEntries(Object.entries(ratios).map(([a, v]) => [a, med(v)])), S, avgBlinds: runs.reduce((s, r) => s + r.blinds.length, 0) / n, kills: S.kills / n, youShots: S.shots.you / n, devilShots: S.shots.devil / n, avgDevilP: S.devilShotP.reduce((a, b) => a + b, 0) / Math.max(1, S.devilShotP.length), handsPerRun: S.hands / n, discardsPerRun: S.discards / n };
+  return { label, n, win, finalWin, classicWin, classicDeath: firstFail.slice(1).map((d) => d / n), deathByAnte: deathByAnte.slice(1).map((d) => d / n), pass, nearMiss: near.near / Math.max(1, near.fail), medRatio: Object.fromEntries(Object.entries(ratios).map(([a, v]) => [a, med(v)])), S, avgBlinds: runs.reduce((s, r) => s + r.blinds.length, 0) / n, kills: S.kills / n, youShots: S.shots.you / n, devilShots: S.shots.devil / n, avgDevilP: S.devilShotP.reduce((a, b) => a + b, 0) / Math.max(1, S.devilShotP.length), avgYouP: S.youShotP.reduce((a, b) => a + b, 0) / Math.max(1, S.youShotP.length), youLiveRate: S.youLive / Math.max(1, S.youLive + S.youDud), devilLiveRate: S.devilLive / Math.max(1, S.devilLive + S.devilDud), ownLiveDeaths: S.ownLiveDeaths / n, deaths: runs.filter((r) => r.died).length / n, handsPerRun: S.hands / n, discardsPerRun: S.discards / n };
 }
 
 module.exports = { runTier, report, playRun };

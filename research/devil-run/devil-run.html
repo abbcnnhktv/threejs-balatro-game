@@ -1,260 +1,300 @@
 <title>恶魔赌局</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Noto+Sans+SC:wght@500;900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap">
 <style>
-/* Layout: the 3D table fills the screen. HUD is floating outlined text in the corners (blind/score top-left, money top-right,
-   jokers top-center, revolver right), the score calculation floats mid-screen, buttons sit under the hand. One dark look. */
+/* Layout: the 3D table fills the screen. HUD lives in small PS1-era menu windows (bevelled border, dark gradient, hard pixel
+   shadows): blind & score top-left, money top-right, revolver right, actions bottom. Nothing floats over the middle of the
+   table while you play. One committed dark look. */
 :root {
-  --ink: #f1e6cc;
-  --dim: #a3937a;
+  --ink: #efe6d2;
+  --dim: #9c8f86;
   --blood: #e0362a;
   --gold: #ffc23d;
-  --chip: #3d9bff;
-  --mult: #ff4a3d;
-  --green: #7fe07a;
+  --chip: #2f7fe6;
+  --mult: #e23b2e;
+  --green: #86e07c;
+  --dud: #8f96a3;
   --bg: #050403;
-  --font-pixel: "DotGothic16", "Noto Sans SC", "Microsoft YaHei", monospace;
-  --font-heavy: "Noto Sans SC", "DotGothic16", sans-serif;
-  --o: 2px 0 0 #000, -2px 0 0 #000, 0 2px 0 #000, 0 -2px 0 #000, 2px 2px 0 #000, -2px 2px 0 #000, 2px -2px 0 #000, -2px -2px 0 #000, 3px 4px 0 rgba(0,0,0,.6);
+  --win-top: rgba(66, 28, 50, 0.94);
+  --win-bot: rgba(14, 7, 18, 0.94);
+  --frame: #d6ccb8;
+  --font: "DotGothic16", "Microsoft YaHei", "PingFang SC", monospace;
+  --sh: 1px 1px 0 #000, 2px 2px 0 rgba(0, 0, 0, 0.55);
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html, body { height: 100%; }
-body { margin: 0; overflow: hidden; background: var(--bg); color: var(--ink); font-family: var(--font-pixel); user-select: none; -webkit-user-select: none; touch-action: manipulation; text-shadow: var(--o); }
+body { margin: 0; overflow: hidden; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 15px; user-select: none; -webkit-user-select: none; touch-action: manipulation; text-shadow: var(--sh); -webkit-font-smoothing: none; font-smooth: never; }
 #gl { position: fixed; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
 .num { font-variant-numeric: tabular-nums; }
-button { font-family: var(--font-pixel); color: var(--ink); cursor: pointer; text-shadow: var(--o); border: 0; background: none; padding: 0; }
-button:disabled { opacity: .3; cursor: default; }
-button:focus-visible { outline: 2px dashed var(--gold); outline-offset: 4px; }
-.btn { white-space: nowrap; font-size: 20px; padding: 10px 22px 12px; border-radius: 6px; box-shadow: 0 4px 0 #000; text-shadow: 2px 2px 0 #000; transition: transform .08s; }
-.btn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 #000; }
-.btn.play { background: #2a6fd6; }
-.btn.disc { background: #c3342a; }
-.btn.gold { background: #c98a12; }
-.btn.ghost { background: rgba(255,255,255,.08); font-size: 16px; padding: 8px 14px 10px; }
 b { font-weight: 400; color: var(--gold); }
 em { font-style: normal; color: var(--blood); }
-i.c { font-style: normal; color: var(--chip); }
-i.m { font-style: normal; color: var(--mult); }
+i.c { font-style: normal; color: #6fb0ff; }
+i.m { font-style: normal; color: #ff7466; }
+i.d { font-style: normal; color: var(--dud); }
+
+/* PS1 menu window */
+.win { background: linear-gradient(180deg, var(--win-top), var(--win-bot)); border: 2px solid var(--frame); border-radius: 4px; box-shadow: inset 0 0 0 1px #000, inset 0 0 0 2px rgba(255, 255, 255, 0.1), 3px 3px 0 rgba(0, 0, 0, 0.7); padding: 7px 10px 8px; }
+.win hr { border: 0; height: 2px; margin: 5px -4px; background: linear-gradient(90deg, transparent, rgba(214, 204, 184, 0.45), transparent); }
+.lbl { color: var(--dim); font-size: 13px; letter-spacing: 0.06em; }
+.sp { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+
+button { font-family: var(--font); color: var(--ink); cursor: pointer; text-shadow: var(--sh); border: 0; background: none; padding: 0; font-size: 17px; }
+button:disabled { opacity: 0.32; cursor: default; }
+button:focus-visible { outline: 1px dotted var(--gold); outline-offset: 3px; }
+/* menu items with the blinking hand cursor */
+.mi { position: relative; padding: 3px 6px 3px 22px; text-align: left; white-space: nowrap; }
+.mi::before { content: "▶"; position: absolute; left: 3px; color: var(--gold); opacity: 0; font-size: 13px; top: 5px; }
+.mi:hover:not(:disabled)::before, .mi:focus-visible::before, .mi.cur::before { opacity: 1; animation: cur 0.8s steps(2) infinite; }
+.mi:hover:not(:disabled), .mi.cur { color: #fff; }
+@keyframes cur { 50% { transform: translateX(3px); } }
 
 #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
 #hud > * { position: absolute; }
-#hud.cine #bottom, #hud.cine #deckLbl, #hud.cine #calc,
-#hud.away #hudL, #hud.away #bottom, #hud.away #deckLbl, #hud.away #calc { visibility: hidden; }
+#hud.cine #bottom, #hud.cine #deckLbl,
+#hud.away #hudL, #hud.away #bottom, #hud.away #deckLbl { visibility: hidden; }
 #hud button, #hud .jk { pointer-events: auto; }
-#hudL { left: 16px; top: calc(12px + env(safe-area-inset-top, 0px)); display: grid; gap: 2px; }
-#anteLbl { font-size: 14px; color: var(--dim); letter-spacing: .1em; }
-#blindLbl { font-family: var(--font-heavy); font-weight: 900; font-size: 26px; }
+
+#hudL { left: 12px; top: calc(12px + env(safe-area-inset-top, 0px)); width: 214px; display: grid; gap: 2px; }
+#blindLbl { font-size: 21px; letter-spacing: 0.04em; }
 #blindLbl.boss { color: var(--blood); }
-#bossLbl { font-size: 14px; color: #ff9b8f; }
-#scoreLine { margin-top: 6px; font-size: 15px; color: var(--dim); }
-#scoreNow { font-family: var(--font-heavy); font-weight: 900; font-size: 36px; color: var(--ink); line-height: 1.05; }
-#scoreNow.bump { animation: bump .25s; }
-#targetLbl { color: var(--mult); }
-.track { width: 210px; height: 6px; background: rgba(0,0,0,.6); margin-top: 4px; box-shadow: 0 0 0 2px #000; }
-.track i { display: block; height: 100%; width: 0; background: var(--gold); transition: width .35s steps(10); }
-#hudR { right: 16px; top: calc(12px + env(safe-area-inset-top, 0px)); text-align: right; display: grid; gap: 2px; justify-items: end; }
-#money { font-family: var(--font-heavy); font-weight: 900; font-size: 38px; color: var(--gold); line-height: 1; }
-#money.bump { animation: bump .25s; }
-#counts { font-size: 16px; }
-#helpBtn { font-size: 15px; color: var(--dim); margin-top: 4px; }
-
-#jbar { left: 50%; top: calc(12px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); display: flex; gap: 8px; }
-.jk { width: 62px; height: 86px; border-radius: 5px; padding: 5px 4px; display: grid; align-content: space-between; text-align: center; font-size: 12px; line-height: 1.2; cursor: pointer; position: relative; box-shadow: 0 0 0 2px #000, 3px 4px 0 2px rgba(0,0,0,.55); text-shadow: 1px 1px 0 #000; }
-.jk.r1 { background: linear-gradient(#3b6fb8, #23436f); }
-.jk.r2 { background: linear-gradient(#3e9a54, #23582f); }
-.jk.r3 { background: linear-gradient(#c3402f, #6b1d14); }
-.jk .face { font-size: 22px; line-height: 1; filter: drop-shadow(1px 1px 0 #000); }
-.jk.empty { background: none; box-shadow: inset 0 0 0 2px rgba(255,255,255,.12); cursor: default; }
-.jk.fire { animation: wig .35s; }
-.jk.on { outline: 3px solid var(--gold); outline-offset: 2px; }
-@keyframes wig { 25% { transform: rotate(-9deg) scale(1.15); } 60% { transform: rotate(7deg) scale(1.1); } }
-@keyframes bump { 40% { transform: scale(1.25); } }
-#jtip { position: fixed; z-index: 12; width: 210px; transform: translateX(-50%); text-align: center; display: grid; gap: 4px; font-size: 15px; line-height: 1.45; pointer-events: auto; }
-#jtip .nm { font-family: var(--font-heavy); font-weight: 900; font-size: 18px; }
-
-#gunHud { right: 18px; top: 42%; transform: translateY(-50%); display: grid; justify-items: center; gap: 6px; text-align: center; }
-#cyl { width: 92px; height: 92px; position: relative; border-radius: 50%; background: radial-gradient(circle, #2b2d31 0 30%, #17181b 31% 100%); box-shadow: 0 0 0 3px #000, 4px 5px 0 2px rgba(0,0,0,.5); transition: transform .5s cubic-bezier(.3,1.6,.5,1); }
-#cyl span { position: absolute; width: 24px; height: 24px; border-radius: 50%; background: #050506; box-shadow: inset 0 0 0 2px #000, 0 0 0 1px #3a3c42; transform: translate(-50%, -50%); }
-#cyl span.you { background: radial-gradient(circle at 35% 35%, #fff2b0, var(--gold) 45%, #8a5d08); box-shadow: 0 0 10px var(--gold); }
-#cyl span.devil { background: radial-gradient(circle at 35% 35%, #ffb0a8, var(--blood) 45%, #5e0e08); box-shadow: 0 0 10px var(--blood); }
-#cyl span.pop { animation: bump .4s 2; }
-#gunTxt { font-size: 14px; line-height: 1.5; max-width: 170px; }
-#gunOdds { font-size: 13px; color: var(--dim); line-height: 1.5; max-width: 180px; }
-
-#calc { left: 50%; top: 38%; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 6px; text-align: center; }
-#handName { font-family: var(--font-heavy); font-weight: 900; font-size: 30px; }
-#handName small { font-family: var(--font-pixel); font-weight: 400; font-size: 15px; color: var(--dim); margin-left: 6px; }
-#cm { display: flex; align-items: center; gap: 8px; font-family: var(--font-heavy); font-weight: 900; }
-#cm span { min-width: 76px; padding: 2px 10px 4px; border-radius: 5px; font-size: 30px; text-align: center; box-shadow: 0 0 0 2px #000, 3px 4px 0 2px rgba(0,0,0,.5); }
+#bossLbl { font-size: 13px; color: #ff9b8f; }
+#scoreNow { font-size: 28px; line-height: 1.1; }
+#scoreNow.bump, #money.bump { animation: bump 0.25s steps(3); }
+.track { height: 8px; background: #000; border: 1px solid #5a4a50; margin-top: 2px; }
+.track i { display: block; height: 100%; width: 0; background: repeating-linear-gradient(90deg, var(--gold) 0 5px, #c48a12 5px 7px); transition: width 0.35s steps(10); }
+#handRow { min-height: 50px; display: grid; gap: 4px; }
+#handName { font-size: 16px; }
+#handName small { font-size: 12px; color: var(--dim); margin-left: 4px; }
+#cm { display: flex; align-items: center; gap: 5px; }
+#cm span { min-width: 54px; padding: 1px 6px 2px; font-size: 18px; text-align: center; border: 1px solid #000; box-shadow: inset 0 1px 0 rgba(255,255,255,.35), inset 0 -2px 0 rgba(0,0,0,.35); }
 #chipsV { background: var(--chip); }
 #multV { background: var(--mult); }
-#cm .x { font-size: 26px; color: var(--ink); }
-#cm span.bump { animation: bump .2s; }
-#est { font-size: 14px; color: var(--dim); }
-#total { font-family: var(--font-heavy); font-weight: 900; font-size: 54px; color: var(--ink); line-height: 1; }
-#total.hot { color: var(--gold); animation: burn .6s; }
-@keyframes burn { 0% { transform: scale(.6); } 40% { transform: scale(1.3); } 100% { transform: scale(1); } }
+#cm .x { font-size: 15px; }
+#cm span.bump { animation: bump 0.18s steps(2); }
+#est { font-size: 13px; color: var(--dim); }
+@keyframes bump { 50% { transform: scale(1.18); } }
 
-#bottom { left: 50%; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: flex; gap: 12px; align-items: center; }
-#deckLbl { right: 18px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); font-size: 14px; color: var(--dim); }
-#sortBtn { font-size: 15px; color: var(--dim); white-space: nowrap; }
+#hudR { right: 12px; top: calc(12px + env(safe-area-inset-top, 0px)); width: 150px; display: grid; gap: 3px; }
+#money { font-size: 28px; color: var(--gold); line-height: 1.1; }
+#helpBtn { font-size: 13px; color: var(--dim); padding-left: 18px; margin-top: 2px; }
 
-#say { position: fixed; left: 50%; top: 13%; transform: translateX(-50%); z-index: 6; font-size: 20px; color: #ffb4a6; text-align: center; max-width: min(560px, 90vw); pointer-events: none; transition: opacity .3s; }
-#banner { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); z-index: 7; text-align: center; pointer-events: none; display: grid; gap: 8px; width: min(720px, 94vw); }
-#banner .big { font-family: var(--font-heavy); font-weight: 900; font-size: clamp(42px, 8vw, 76px); line-height: 1.05; letter-spacing: .04em; }
-#banner .sm { font-size: 18px; line-height: 1.6; }
-#banner.in { animation: slam .45s cubic-bezier(.2,1.6,.4,1); }
-@keyframes slam { 0% { transform: translate(-50%, -50%) scale(2.2); opacity: 0; } 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
-#hint { position: fixed; z-index: 9; left: 16px; top: 33%; width: 270px; font-size: 16px; line-height: 1.6; pointer-events: auto; display: grid; gap: 6px; }
-#hint .k { font-size: 13px; color: var(--gold); letter-spacing: .12em; }
+#jbar { left: 50%; top: calc(12px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); display: flex; gap: 7px; }
+.jk { width: 60px; height: 82px; padding: 4px 3px; display: grid; align-content: space-between; text-align: center; font-size: 11px; line-height: 1.2; cursor: pointer; position: relative; border: 2px solid var(--frame); border-radius: 3px; box-shadow: inset 0 0 0 1px #000, 3px 3px 0 rgba(0,0,0,.7); }
+.jk.r1 { background: linear-gradient(#34508a, #141c3a); }
+.jk.r2 { background: linear-gradient(#2f6e3e, #102414); }
+.jk.r3 { background: linear-gradient(#8a2a22, #2a0a08); }
+.jk .face { font-size: 21px; line-height: 1; }
+.jk.empty { background: rgba(0,0,0,.25); border: 2px dashed rgba(214,204,184,.25); box-shadow: none; cursor: default; }
+.jk.fire { animation: wig 0.32s steps(4); }
+.jk.on { border-color: var(--gold); }
+@keyframes wig { 33% { transform: translateY(-6px) rotate(-6deg); } 66% { transform: translateY(-3px) rotate(5deg); } }
+#jtip { position: fixed; z-index: 12; width: 220px; transform: translateX(-50%); display: grid; gap: 4px; line-height: 1.45; pointer-events: auto; }
+#jtip .nm { font-size: 16px; color: var(--gold); }
+
+#gunHud { right: 12px; top: 46%; transform: translateY(-50%); width: 150px; display: grid; justify-items: center; gap: 6px; text-align: center; }
+#cyl { width: 84px; height: 84px; position: relative; border-radius: 50%; background: radial-gradient(circle, #34363c 0 28%, #18191c 29% 100%); border: 2px solid #000; box-shadow: 0 0 0 2px #5c5f66; transition: transform 0.5s steps(6); }
+#cyl span { position: absolute; width: 22px; height: 22px; border-radius: 50%; background: #050506; border: 2px solid #000; transform: translate(-50%, -50%); display: grid; place-items: center; font-size: 12px; text-shadow: none; color: #fff; }
+#cyl span.you.live { background: radial-gradient(circle at 35% 35%, #fff2b0, var(--gold) 45%, #8a5d08); }
+#cyl span.you.dud { background: radial-gradient(circle at 35% 35%, #e8ecf2, var(--dud) 50%, #3c4048); }
+#cyl span.devil { background: radial-gradient(circle at 35% 35%, #c0605a, #6e1410 55%, #2a0604); color: #ffb0a8; }
+#cyl span.devil.live.shown { background: radial-gradient(circle at 35% 35%, #ffb0a8, var(--blood) 45%, #5e0e08); color: transparent; }
+#cyl span.devil.dud.shown { background: radial-gradient(circle at 35% 35%, #e8ecf2, var(--dud) 50%, #3c4048); color: transparent; }
+#cyl span.pop { animation: bump 0.4s steps(3) 2; }
+#gunTxt { font-size: 13px; line-height: 1.55; }
+#gunOdds { font-size: 12px; color: var(--dim); line-height: 1.5; }
+
+#bottom { left: 50%; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: flex; gap: 4px; align-items: center; padding: 4px 8px; }
+#bottom .mi { font-size: 18px; }
+#playBtn { color: #8fc4ff; }
+#discBtn { color: #ff8f84; }
+#sortBtn { color: var(--dim); font-size: 14px !important; }
+#deckLbl { right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); font-size: 13px; color: var(--dim); }
+
+#say { position: fixed; left: 50%; top: calc(108px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); z-index: 6; max-width: min(520px, 92vw); pointer-events: none; transition: opacity 0.25s steps(3); display: flex; gap: 8px; align-items: baseline; padding: 6px 12px 7px; }
+#say .who { color: var(--blood); font-size: 13px; white-space: nowrap; }
+#sayTxt { font-size: 16px; }
+#banner { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); z-index: 7; text-align: center; pointer-events: none; display: grid; gap: 6px; width: min(720px, 94vw); }
+#banner .big { font-size: clamp(36px, 7vw, 64px); line-height: 1.1; letter-spacing: 0.12em; text-shadow: 3px 3px 0 #000, 6px 6px 0 rgba(0,0,0,.45); }
+#banner .sm { font-size: 17px; line-height: 1.6; }
+#banner.in { animation: slam 0.32s steps(5); }
+@keyframes slam { 0% { transform: translate(-50%, -50%) scale(1.8); opacity: 0; } 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
+
+#hint { position: fixed; z-index: 9; left: 12px; top: calc(260px + env(safe-area-inset-top, 0px)); width: 238px; line-height: 1.6; pointer-events: auto; display: grid; gap: 6px; }
+#hint .k { font-size: 12px; color: var(--gold); letter-spacing: 0.15em; }
 #hint button { justify-self: start; font-size: 14px; color: var(--gold); }
-#cash { position: fixed; left: 50%; top: 30%; transform: translateX(-50%); z-index: 7; display: grid; gap: 4px; min-width: 260px; font-size: 18px; pointer-events: none; }
-#cash div { display: flex; justify-content: space-between; gap: 30px; animation: slide .3s both; }
+#cash { position: fixed; left: 50%; top: 28%; transform: translateX(-50%); z-index: 7; display: grid; gap: 3px; min-width: 260px; pointer-events: none; }
+#cash div { display: flex; justify-content: space-between; gap: 30px; animation: slide 0.2s steps(3) both; }
 #cash div span:last-child { color: var(--gold); }
-#cash .sum { font-family: var(--font-heavy); font-weight: 900; font-size: 30px; margin-top: 6px; }
-@keyframes slide { from { transform: translateX(-30px); opacity: 0; } }
+#cash .sum { font-size: 20px; margin-top: 3px; }
+@keyframes slide { from { transform: translateX(-16px); opacity: 0; } }
 
-.pop { position: fixed; z-index: 8; pointer-events: none; font-family: var(--font-heavy); font-weight: 900; font-size: 28px; transform: translate(-50%, -50%); animation: up 1s cubic-bezier(.2,1.4,.4,1) forwards; white-space: nowrap; }
-.pop.c { color: var(--chip); } .pop.m { color: var(--mult); } .pop.g { color: var(--gold); } .pop.n { color: var(--dim); font-size: 20px; } .pop.big { font-size: 48px; }
-@keyframes up { 0% { transform: translate(-50%, -20%) scale(.4); opacity: 0; } 20% { transform: translate(-50%, -60%) scale(1.25); opacity: 1; } 75% { opacity: 1; } 100% { transform: translate(-50%, -140%) scale(1); opacity: 0; } }
+/* load menu */
+#load { position: fixed; z-index: 9; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); width: min(460px, calc(100vw - 24px)); display: grid; gap: 6px; line-height: 1.55; }
+#load .ttl { font-size: 18px; color: var(--gold); letter-spacing: 0.1em; }
+#load .opts { display: grid; gap: 2px; margin: 2px 0; }
+#load .mi { font-size: 18px; padding-top: 4px; padding-bottom: 4px; }
+#load .mi small { font-size: 13px; color: var(--dim); margin-left: 8px; }
+#load .info { font-size: 13px; color: var(--ink); }
+#load .info .lbl { font-size: 12px; }
+
+.pop { position: fixed; z-index: 8; pointer-events: none; font-size: 22px; transform: translate(-50%, -50%); animation: up 0.9s steps(9) forwards; white-space: nowrap; text-shadow: 2px 2px 0 #000; }
+.pop.c { color: #6fb0ff; } .pop.m { color: #ff7466; } .pop.g { color: var(--gold); } .pop.n { color: var(--dim); font-size: 16px; } .pop.big { font-size: 34px; }
+@keyframes up { 0% { transform: translate(-50%, -30%); opacity: 0; } 15% { transform: translate(-50%, -70%); opacity: 1; } 75% { opacity: 1; } 100% { transform: translate(-50%, -150%); opacity: 0; } }
 #flash, #hurt, #fade { position: fixed; inset: 0; pointer-events: none; opacity: 0; }
 #flash { z-index: 8; background: #fff; }
-#hurt { z-index: 8; background: radial-gradient(ellipse at center, transparent 25%, rgba(170, 0, 0, .9)); }
-#fade { z-index: 9; background: #000; transition: opacity 1.2s; }
+#hurt { z-index: 8; background: radial-gradient(ellipse at center, transparent 25%, rgba(170, 0, 0, 0.9)); }
+#fade { z-index: 9; background: #000; transition: opacity 1.2s steps(8); }
 
-.ov { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 16px; background: radial-gradient(ellipse at center, rgba(0,0,0,.35), rgba(0,0,0,.82)); overflow: auto; }
-.ovIn { display: grid; gap: 16px; justify-items: center; text-align: center; width: min(760px, 100%); }
-.ovIn h2 { margin: 0; font-family: var(--font-heavy); font-weight: 900; font-size: 40px; letter-spacing: .06em; }
-.ovIn .sub { color: var(--dim); font-size: 15px; line-height: 1.6; }
-.row { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
-.item { display: grid; gap: 8px; justify-items: center; width: 136px; }
-.card { width: 124px; height: 170px; border-radius: 8px; padding: 10px 8px; display: grid; align-content: space-between; gap: 4px; font-size: 13px; line-height: 1.45; text-shadow: 1px 1px 0 #000; box-shadow: 0 0 0 3px #000, 5px 6px 0 3px rgba(0,0,0,.5); animation: deal .45s cubic-bezier(.2,1.5,.4,1) both; }
-.card .nm { font-family: var(--font-heavy); font-weight: 900; font-size: 17px; }
-.card .face { font-size: 34px; line-height: 1; }
-.card.r1 { background: linear-gradient(#3b6fb8, #1d3a63); }
-.card.r2 { background: linear-gradient(#3e9a54, #1f4f2a); }
-.card.r3 { background: linear-gradient(#c3402f, #5e190f); }
-.card.pl { background: linear-gradient(#5a3e9e, #241645); }
-.card.sold { opacity: .25; filter: grayscale(1); }
-.item:nth-child(2) .card { animation-delay: .08s; } .item:nth-child(3) .card { animation-delay: .16s; } .item:nth-child(4) .card { animation-delay: .24s; }
-@keyframes deal { from { transform: translateY(60px) rotate(-8deg) scale(.7); opacity: 0; } }
-.price { font-size: 18px; color: var(--gold); }
-.item .btn { font-size: 16px; padding: 6px 16px 8px; }
+.ov { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 16px; background: rgba(0, 0, 0, 0.62); overflow: auto; }
+.ovIn { display: grid; gap: 14px; justify-items: center; text-align: center; width: min(760px, 100%); }
+.ovIn h2 { margin: 0; font-weight: 400; font-size: 34px; letter-spacing: 0.14em; text-shadow: 3px 3px 0 #000; }
+.ovIn .sub { color: var(--dim); line-height: 1.6; }
+.row { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+.item { display: grid; gap: 6px; justify-items: center; width: 132px; }
+.card { width: 124px; height: 168px; border: 2px solid var(--frame); border-radius: 4px; padding: 8px 7px; display: grid; align-content: space-between; gap: 4px; font-size: 12px; line-height: 1.45; box-shadow: inset 0 0 0 1px #000, 4px 4px 0 rgba(0,0,0,.7); animation: deal 0.3s steps(5) both; }
+.card .nm { font-size: 16px; }
+.card .face { font-size: 32px; line-height: 1; }
+.card.r1 { background: linear-gradient(#34508a, #141c3a); }
+.card.r2 { background: linear-gradient(#2f6e3e, #102414); }
+.card.r3 { background: linear-gradient(#8a2a22, #2a0a08); }
+.card.pl { background: linear-gradient(#4b3486, #170d33); }
+.card.sold { opacity: 0.25; filter: grayscale(1); }
+.item:nth-child(2) .card { animation-delay: 0.06s; } .item:nth-child(3) .card { animation-delay: 0.12s; } .item:nth-child(4) .card { animation-delay: 0.18s; }
+@keyframes deal { from { transform: translateY(40px); opacity: 0; } }
+.price { color: var(--gold); }
+.menu { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; padding: 4px 10px; }
 
-#title .ovIn h1 { margin: 0; font-family: var(--font-heavy); font-weight: 900; font-size: clamp(60px, 14vw, 120px); color: var(--blood); letter-spacing: .08em; line-height: 1; text-shadow: var(--o), 0 0 40px rgba(224,54,42,.45); animation: throb 3s ease-in-out infinite; }
-@keyframes throb { 50% { text-shadow: var(--o), 0 0 70px rgba(224,54,42,.75); } }
-.lines { display: grid; gap: 8px; font-size: 17px; line-height: 1.55; max-width: 560px; text-align: left; }
-.lines span::before { content: "▸ "; color: var(--blood); }
-.rules { text-align: left; display: grid; gap: 10px; font-size: 16px; line-height: 1.6; max-width: 640px; }
-table.ht { border-collapse: collapse; font-size: 15px; }
-table.ht td { padding: 2px 12px; text-align: left; }
+#title .ovIn { gap: 18px; }
+#title h1 { margin: 0; font-weight: 400; font-size: clamp(56px, 13vw, 116px); color: var(--blood); letter-spacing: 0.1em; line-height: 1; text-shadow: 4px 4px 0 #000, 8px 8px 0 rgba(0,0,0,.5), 0 0 36px rgba(224,54,42,.4); }
+#title .tag { color: var(--dim); letter-spacing: 0.2em; font-size: 14px; }
+.lines { display: grid; gap: 6px; line-height: 1.6; max-width: 560px; text-align: left; }
+.lines span::before { content: "◆ "; color: var(--blood); }
+.rules { text-align: left; display: grid; gap: 9px; line-height: 1.6; max-width: 640px; }
+table.ht { border-collapse: collapse; }
+table.ht td { padding: 1px 12px; text-align: left; }
 table.ht td:nth-child(n+2) { text-align: right; }
-.endStats { display: grid; grid-template-columns: auto auto; gap: 4px 24px; font-size: 17px; text-align: left; }
+.endStats { display: grid; grid-template-columns: auto auto; gap: 4px 24px; text-align: left; }
 .endStats span:nth-child(even) { color: var(--gold); text-align: right; }
+.blink { animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0.25; } }
 
 @media (max-width: 760px) {
-  #jbar { top: calc(96px + env(safe-area-inset-top, 0px)); gap: 5px; }
-  .jk { width: 52px; height: 72px; font-size: 11px; }
-  .jk .face { font-size: 18px; }
-  #blindLbl { font-size: 21px; }
-  #scoreNow { font-size: 28px; }
-  #money { font-size: 30px; }
-  .track { width: 150px; }
-  #gunHud { top: calc(184px + env(safe-area-inset-top, 0px)); right: 10px; transform: none; }
-  #cyl { width: 64px; height: 64px; }
-  #cyl span { width: 16px; height: 16px; }
-  #gunTxt { font-size: 12px; max-width: 120px; }
+  body { font-size: 13px; }
+  #hudL { width: 158px; padding: 5px 7px 6px; }
+  #blindLbl { font-size: 16px; }
+  #scoreNow { font-size: 21px; }
+  #handRow { min-height: 42px; }
+  #cm span { min-width: 40px; font-size: 14px; }
+  #hudR { width: 112px; padding: 5px 7px 6px; }
+  #money { font-size: 21px; }
+  #jbar { top: calc(226px + env(safe-area-inset-top, 0px)); gap: 4px; }
+  .jk { width: 48px; height: 64px; font-size: 10px; }
+  .jk .face { font-size: 16px; }
+  #gunHud { top: calc(150px + env(safe-area-inset-top, 0px)); transform: none; width: 112px; padding: 5px; }
+  #cyl { width: 60px; height: 60px; }
+  #cyl span { width: 15px; height: 15px; font-size: 9px; }
   #gunOdds { display: none; }
-  #calc { top: 37%; }
-  #handName { font-size: 23px; }
-  #cm span { font-size: 22px; min-width: 56px; }
-  #total { font-size: 40px; }
-  #hint { left: 12px; right: 12px; width: auto; top: 31%; font-size: 15px; }
-  #say { top: 25%; font-size: 17px; }
-  .btn { font-size: 18px; padding: 9px 18px 11px; }
+  #gunTxt { font-size: 11px; }
+  #say { top: auto; bottom: 46%; }
+  #hint { left: 10px; right: 10px; width: auto; top: auto; bottom: 46%; }
+  #bottom .mi { font-size: 16px; }
   #deckLbl { display: none; }
-  .card { width: 104px; height: 150px; font-size: 12px; }
-  .item { width: 110px; }
+  .card { width: 104px; height: 150px; font-size: 11px; }
+  .item { width: 108px; }
 }
-@media (prefers-reduced-motion: reduce) { *, *::before { animation-duration: .01s !important; transition-duration: .01s !important; } }
+@media (prefers-reduced-motion: reduce) { *, *::before { animation-duration: 0.01s !important; transition-duration: 0.01s !important; } }
 </style>
 
 <canvas id="gl" aria-label="恶魔赌局 3D 赌桌"></canvas>
 <div id="flash"></div><div id="hurt"></div><div id="fade"></div>
 
 <div id="hud" hidden>
-  <div id="hudL">
-    <div id="anteLbl" class="num">底注 1 / 8</div>
+  <div id="hudL" class="win">
+    <div class="sp lbl"><span id="anteLbl" class="num">底注 1/8</span><span id="stepLbl">第 1 关</span></div>
     <div id="blindLbl">小盲注</div>
     <div id="bossLbl" hidden></div>
-    <div id="scoreLine">得分　目标 <span id="targetLbl" class="num">300</span></div>
-    <div id="scoreNow" class="num">0</div>
+    <hr>
+    <div class="sp"><span class="lbl">目标</span><span id="targetLbl" class="num" style="color:#ff7466">300</span></div>
+    <div class="sp"><span class="lbl">得分</span><span id="scoreNow" class="num">0</span></div>
     <div class="track"><i id="scoreBar"></i></div>
+    <hr>
+    <div id="handRow">
+      <div id="handName" class="lbl">选牌 · 最多 5 张</div>
+      <div id="cm"><span id="chipsV" class="num">0</span><span class="x">×</span><span id="multV" class="num">0</span></div>
+      <div id="est" class="num"></div>
+    </div>
   </div>
   <div id="jbar"></div>
-  <div id="hudR">
+  <div id="hudR" class="win">
     <div id="money" class="num">$4</div>
-    <div id="counts" class="num"><i class="c">出牌 4</i>　<i class="m">弃牌 3</i></div>
-    <button id="helpBtn">规则 / 牌型 ?</button>
+    <div class="sp"><span class="lbl">出牌</span><i class="c num" id="handsLbl">4</i></div>
+    <div class="sp"><span class="lbl">弃牌</span><i class="m num" id="discLbl">3</i></div>
+    <button id="helpBtn" class="mi">规则</button>
   </div>
-  <div id="gunHud">
+  <div id="gunHud" class="win">
     <div id="cyl"></div>
     <div id="gunTxt"></div>
     <div id="gunOdds"></div>
   </div>
-  <div id="calc" hidden>
-    <div id="handName"></div>
-    <div id="cm"><span id="chipsV" class="num">0</span><span class="x">×</span><span id="multV" class="num">0</span></div>
-    <div id="est" class="num"></div>
-    <div id="total" class="num" hidden></div>
-  </div>
-  <div id="bottom">
-    <button class="btn disc" id="discBtn">弃牌</button>
-    <button id="sortBtn">按点数</button>
-    <button class="btn play" id="playBtn">出牌</button>
+  <div id="bottom" class="win">
+    <button class="mi" id="playBtn">出牌</button>
+    <button class="mi" id="discBtn">弃牌</button>
+    <button class="mi" id="sortBtn">按点数</button>
   </div>
   <div id="deckLbl" class="num">牌堆 44</div>
 </div>
-<div id="say"></div>
+<div id="say" class="win" style="opacity:0"><span class="who">恶魔</span><span id="sayTxt"></span></div>
 <div id="banner" hidden><div class="big" id="bnBig"></div><div class="sm" id="bnSm"></div></div>
-<div id="cash" hidden></div>
-<div id="hint" hidden><div class="k">提示</div><div id="hintTxt"></div><button id="hintOk">知道了 ▸</button></div>
-<div id="jtip" hidden></div>
+<div id="cash" class="win" hidden></div>
+<div id="hint" class="win" hidden><div class="k">提示</div><div id="hintTxt"></div><button id="hintOk" class="mi cur">知道了</button></div>
+<div id="jtip" class="win" hidden></div>
+<div id="load" class="win" hidden>
+  <div class="ttl" id="loadTtl">装弹</div>
+  <div class="info" id="loadInfo"></div>
+  <hr>
+  <div class="opts">
+    <button class="mi cur" id="liveBtn">实弹<small>免费</small></button>
+    <button class="mi" id="dudBtn">哑弹<small>$3</small></button>
+  </div>
+  <div class="info lbl" id="loadNote"></div>
+</div>
 
 <div class="ov" id="title">
   <div class="ovIn">
     <h1>恶魔赌局</h1>
-    <div class="sub">小丑牌的玩法 · 一把左轮 · 八个底注</div>
-    <div class="lines">
-      <span>和小丑牌一样：每个底注打 <b>小盲、大盲、Boss</b> 三关，用德州牌型凑分，<i class="c">筹码</i> × <i class="m">倍率</i>。</span>
-      <span>每一关，<b>赢的一方往左轮里装一发自己的子弹</b>。你过关装<b>金弹</b>，没过关恶魔装<em>红弹</em>。</span>
-      <span>Boss 关的赢家装弹后<b>开枪</b>：命中率 = 自己的子弹数 / 6。</span>
-      <span>你打中，恶魔掉宝；<em>恶魔打中，你就死了</em>。只要没死，就继续。</span>
+    <div class="tag">小丑牌 × 左轮　·　八个底注</div>
+    <div class="lines win">
+      <span>和小丑牌一样：每个底注打<b>小盲、大盲、Boss</b>，用德州牌型凑分，<i class="c">筹码</i> × <i class="m">倍率</i>。</span>
+      <span>每一关的赢家往左轮里装一发子弹，自己选<b>实弹</b>还是<i class="d">哑弹</i>。对方只看得到装了一发，看不到是什么。</span>
+      <span><b>Boss 关的赢家开枪</b>。枪里所有实弹都算数，包括你自己装的。</span>
+      <span>打中恶魔，按枪里的实弹数领赏金；<em>恶魔打中你，游戏结束</em>。</span>
     </div>
-    <div class="row">
-      <button class="btn play" id="startBtn">开始赌局</button>
-      <button class="btn ghost" id="rulesBtn">完整规则</button>
+    <div class="menu win">
+      <button class="mi cur" id="startBtn">开始赌局</button>
+      <button class="mi" id="rulesBtn">完整规则</button>
     </div>
+    <div class="tag blink">点击开始</div>
   </div>
 </div>
 
 <div class="ov" id="help" hidden>
-  <div class="ovIn">
+  <div class="ovIn win" style="padding:18px">
     <h2>规则</h2>
     <div class="rules">
-      <span><b>出牌</b>：每关 4 次出牌、3 次弃牌，手牌 8 张。每次选 1–5 张打出，按牌型得分：（牌型<i class="c">筹码</i> + 计分牌点数）× 牌型<i class="m">倍率</i>，再经过小丑加成。累计分数达到目标就过关。</span>
-      <span><b>装弹</b>：每关结束，赢家装 1 发自己的子弹（过关 = 你，没过关 = 恶魔）。左轮 6 个弹位，每个底注开始时清空。</span>
-      <span><b>开枪</b>：Boss 关结束，赢家装弹后立刻开枪。命中率 = 他自己的子弹 / 6。所以三关全赢，你开枪是 3/6；三关全输，恶魔开枪也是 3/6。</span>
-      <span><b>结果</b>：你打中 → 恶魔倒下，掉 $8 和一张小丑（三选一）。恶魔打中 → 你死了，游戏结束。没打中 → 什么都没发生，继续。</span>
-      <span><b>输了一关</b>不会结束游戏，只是没有过关奖励，并且送了恶魔一发子弹。</span>
-      <span><b>商店</b>：每关之后。小丑是被动加成，星球牌升级牌型。每存 $5 有 $1 利息（最多 $5）。</span>
-      <span><b>通关</b>：打赢第 8 底注的 Boss。活着离开也算活下来。</span>
+      <span><b>出牌</b>：每关 4 次出牌、3 次弃牌，手牌 8 张。每次打 1–5 张，按牌型得分：（牌型<i class="c">筹码</i> + 计分牌点数）×<i class="m">倍率</i>，再经过小丑加成。累计到目标分就赢下这一关。</span>
+      <span><b>装弹</b>：每关结束，赢家装 1 发子弹（你过关 = 你装，没过关 = 恶魔装）。你可以选<b>实弹</b>（免费）或<i class="d">哑弹</i>（$3）。恶魔看不到你装的是什么，你也看不到他的。每个底注开始时左轮清空。</span>
+      <span><b>开枪</b>：Boss 关结束，赢家装弹后转轮开枪。命中率 = 枪里实弹数 / 6，<em>不管实弹是谁装的</em>。</span>
+      <span><b>结果</b>：你打中 → 恶魔倒下，赏金 $8 + 每发实弹 $4，再三选一一张小丑。恶魔打中 → 你死了。没打中 → 继续。</span>
+      <span><b>怎么选</b>：觉得自己能赢下 Boss 关，就装实弹，赏金更高；没把握就花 $3 装哑弹，免得 Boss 关输了被自己的子弹打死。</span>
+      <span><b>输一关</b>不会结束游戏，只是没有过关奖励，并且让恶魔装一发。</span>
+      <span><b>商店</b>：每关之后。每存 $5 有 $1 利息（最多 $5）。</span>
+      <span><b>通关</b>：打赢第 8 底注的 Boss。活着打完 8 个底注也算活下来。</span>
     </div>
     <table class="ht" id="handTable"></table>
-    <button class="btn play" id="helpClose">回到赌桌</button>
+    <button class="mi cur" id="helpClose">回到赌桌</button>
   </div>
 </div>
 
@@ -263,9 +303,9 @@ table.ht td:nth-child(n+2) { text-align: right; }
     <h2>商店</h2>
     <div class="sub" id="shopSub"></div>
     <div class="row" id="shopRow"></div>
-    <div class="row">
-      <button class="btn gold" id="rerollBtn">刷新 $4</button>
-      <button class="btn play" id="nextBtn">下一关 ▸</button>
+    <div class="menu win">
+      <button class="mi" id="rerollBtn">刷新 $4</button>
+      <button class="mi cur" id="nextBtn">下一关</button>
     </div>
   </div>
 </div>
@@ -275,16 +315,16 @@ table.ht td:nth-child(n+2) { text-align: right; }
     <h2 style="color:var(--gold)">恶魔的遗物</h2>
     <div class="sub" id="pickSub">选一张小丑带走</div>
     <div class="row" id="pickRow"></div>
-    <button class="btn ghost" id="pickSkip">都不要</button>
+    <div class="menu win"><button class="mi" id="pickSkip">都不要</button></div>
   </div>
 </div>
 
 <div class="ov" id="end" hidden>
-  <div class="ovIn">
+  <div class="ovIn win" style="padding:20px;width:min(460px,100%)">
     <h2 id="endTitle"></h2>
     <div class="sub" id="endSub"></div>
     <div class="endStats" id="endStats"></div>
-    <button class="btn play" id="againBtn">再来一局</button>
+    <button class="mi cur" id="againBtn">再来一局</button>
   </div>
 </div>
 
@@ -414,14 +454,15 @@ table.ht td:nth-child(n+2) { text-align: right; }
   /* ───────────── blinds, bosses, the revolver ───────────── */
   const CONFIG = {
     antes: 8,
-    anteBase: [300, 1100, 2500, 5000, 9800, 18000, 31000, 52000],
+    anteBase: [300, 1000, 2300, 4600, 9000, 16500, 28000, 47000],
     blindMult: [1, 1.5, 2],
     blindReward: [3, 4, 5],
     hands: 4, discards: 3, handSize: 8, jokerSlots: 5, startMoney: 4,
     interestPer: 5, interestCap: 5,
     shopJokers: 2, shopPlanets: 2, rerollBase: 4,
     chambers: 6,
-    devilKillMoney: 8,
+    devilKillMoney: 8, bountyPerLive: 4, dudCost: 3,
+    devilSureBelow: 0.75, devilLiveSure: 0.7, devilLiveNear: 0.4,
   };
   const BOSSES = [
     { id: 'wall', name: '高墙', desc: '目标分 ×2', targetMult: 2 },
@@ -443,7 +484,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
     return {
       ante: 1, blind: 0, money: CONFIG.startMoney, jokers: [], levels: Object.fromEntries(HAND_ORDER.map((h) => [h, 1])),
       plays: Object.fromEntries(HAND_ORDER.map((h) => [h, 0])), green: 0, planetsUsed: 0,
-      gun: { you: 0, devil: 0 }, // bullets loaded this ante
+      gun: { chambers: [] }, // this ante's bullets in load order: { who: 'you'|'devil', live }
       boss: BOSSES[Math.floor(rng() * BOSSES.length)], alive: true, devilsKilled: 0, log: [],
     };
   }
@@ -492,14 +533,30 @@ table.ht td:nth-child(n+2) { text-align: right; }
   }
   function draw(b) { while (b.hand.length < b.handSize && b.deck.length) b.hand.push(b.deck.pop()); }
 
-  // the winner of each blind loads one of their own bullets; the boss winner loads, then fires
-  function loadBullet(run, youWon) { if (youWon) run.gun.you++; else run.gun.devil++; }
+  // The winner of each blind loads one bullet and chooses live or dud; the other side sees a bullet go in, not which.
+  // The boss winner loads, spins and fires. Every live round counts, whoever loaded it: your live round can kill you.
+  // a dud is insurance and costs money; a live round is free. You must load live if you can't pay.
+  function loadBullet(run, youWon, live) {
+    if (youWon && !live) { if (run.money < CONFIG.dudCost) live = true; else run.money -= CONFIG.dudCost; }
+    run.gun.chambers.push({ who: youWon ? 'you' : 'devil', live: !!live });
+    return !!live;
+  }
+  // killing the devil pays a bounty that grows with every live round in the gun
+  const killMoney = (shot) => CONFIG.devilKillMoney + CONFIG.bountyPerLive * shot.live;
+  const liveCount = (run) => run.gun.chambers.filter((c) => c.live).length;
   function hitChance(n) { return Math.min(1, n / CONFIG.chambers); }
   function bossShot(run, youWon, rng) {
-    const shooter = youWon ? 'you' : 'devil';
-    const p = hitChance(run.gun[shooter]);
+    const shooter = youWon ? 'you' : 'devil', live = liveCount(run);
+    const p = hitChance(live);
     const hit = rng() < p;
-    return { shooter, p, hit, bullets: { ...run.gun } };
+    return { shooter, p, hit, live, chambers: run.gun.chambers.map((c) => ({ ...c })) };
+  }
+  // the devil only loads after you fail a blind. Boss win: always live. Otherwise he bets on you failing again.
+  function devilLoadsLive(blindIdx, ratio, rng) { return blindIdx === 2 || rng() < (ratio < CONFIG.devilSureBelow ? CONFIG.devilLiveSure : CONFIG.devilLiveNear); }
+  // your firepower this blind (points per hand) projected onto this ante's boss: 1.0 = exactly enough
+  function projectBoss(run, score, handsUsed) {
+    const boss = run.boss, hands = boss.hands || CONFIG.hands;
+    return (score / Math.max(1, handsUsed)) * hands / blindTarget(run.ante, 2, boss);
   }
 
   function endBlindMoney(run, b, won) {
@@ -517,7 +574,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
   }
   function advance(run, rng) {
     run.blind++;
-    if (run.blind > 2) { run.blind = 0; run.ante++; run.gun = { you: 0, devil: 0 }; run.boss = BOSSES[Math.floor(rng() * BOSSES.length)]; }
+    if (run.blind > 2) { run.blind = 0; run.ante++; run.gun = { chambers: [] }; run.boss = BOSSES[Math.floor(rng() * BOSSES.length)]; }
     return run.ante > CONFIG.antes ? 'victory' : 'next';
   }
 
@@ -555,7 +612,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
   const DL = {
     SUITS, SUIT_SYM, SUIT_NAME, rankLabel, cardChips, isFace, makeDeck, shuffle, HANDS, HAND_ORDER, evaluate, analyze, contains,
     JOKERS, JOKER_BY_ID, PLANETS, CONFIG, BOSSES, BLIND_NAMES, blindTarget, newRun, score, notePlayed, noteDiscard,
-    startBlind, draw, loadBullet, hitChance, bossShot, endBlindMoney, advance, rollShop, devilDrop, buy, sellValue,
+    startBlind, draw, loadBullet, killMoney, liveCount, hitChance, bossShot, devilLoadsLive, projectBoss, endBlindMoney, advance, rollShop, devilDrop, buy, sellValue,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = DL; else root.DL = DL;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -805,7 +862,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
   };
   gun.position.copy(GUN_POSES.rest.p); gun.rotation.copy(GUN_POSES.rest.r);
   const bulletGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.05, 6);
-  const bulletMat = { you: new THREE.MeshBasicMaterial({ color: 0xffc23d }), devil: new THREE.MeshBasicMaterial({ color: 0xe0362a }) };
+  const bulletMat = { you: new THREE.MeshBasicMaterial({ color: 0xffc23d }), devil: new THREE.MeshBasicMaterial({ color: 0x8a1a12 }), dud: new THREE.MeshBasicMaterial({ color: 0x9aa2ae }) };
   const casings = [];
 
   /* ═════════ cards ═════════ */
@@ -871,7 +928,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
   function trash(c, dir = 1) { const o = cards3d.get(c.id); if (!o) return; cards3d.delete(c.id); o.speed = 7; o.place(new THREE.Vector3(1.5 * dir, 0.95, 0.0), new THREE.Euler(-1.2, 0, 1.4 * dir), false); setTimeout(() => o.dispose(), 700); }
 
   /* ═════════ game state ═════════ */
-  const G = { pending: null, phase: 'title', run: null, b: null, sel: new Set(), sortBy: 'rank', busy: false, played: [], hover: null, stats: null, rerolls: 0, shop: [], hints: new Set(), chamberOrder: [] };
+  const G = { pending: null, phase: 'title', run: null, b: null, sel: new Set(), sortBy: 'rank', busy: false, played: [], hover: null, stats: null, rerolls: 0, shop: [], hints: new Set(), cham: [], reveal: false };
   const DECK_POS = new THREE.Vector3(0.95, 0.95, 0.15), DECK_ROT = new THREE.Euler(-1.2, 0, 0.4);
   const handNow = () => (G.b ? G.b.hand : []);
 
@@ -927,20 +984,22 @@ table.ht td:nth-child(n+2) { text-align: right; }
   function renderCyl() {
     const cyl = $('cyl'), r = cyl.offsetWidth * 0.3, c = cyl.offsetWidth / 2;
     cyl.innerHTML = Array.from({ length: 6 }, (_, i) => {
-      const a = -Math.PI / 2 + (i / 6) * Math.PI * 2, who = G.chamberOrder[i] || '';
-      return `<span class="${who}" style="left:${c + Math.cos(a) * r}px;top:${c + Math.sin(a) * r}px"></span>`;
+      const a = -Math.PI / 2 + (i / 6) * Math.PI * 2, ch = G.cham[i];
+      const cls = ch ? `${ch.who} ${ch.live ? 'live' : 'dud'}${G.reveal ? ' shown' : ''}` : '';
+      return `<span class="${cls}" style="left:${c + Math.cos(a) * r}px;top:${c + Math.sin(a) * r}px">${ch && ch.who === 'devil' && !G.reveal ? '?' : ''}</span>`;
     }).join('');
-    const g = G.run.gun;
-    $('gunTxt').innerHTML = `<b>你 ${g.you} 发</b>　<em>恶魔 ${g.devil} 发</em>`;
+    const mineLive = G.cham.filter((x) => x.who === 'you' && x.live).length, mineDud = G.cham.filter((x) => x.who === 'you' && !x.live).length;
+    const his = G.cham.filter((x) => x.who === 'devil').length;
+    $('gunTxt').innerHTML = `<b>你：实 ${mineLive}</b> · <i class="d">哑 ${mineDud}</i><br><em>恶魔：? × ${his}</em>`;
     const boss = G.run.blind === 2 && (G.phase === 'play' || G.phase === 'intro' || G.phase === 'score');
     $('gunOdds').innerHTML = boss
-      ? `这关赢 → <b>你开枪 ${g.you + 1}/6</b><br>这关输 → <em>恶魔开枪 ${g.devil + 1}/6</em>`
-      : `Boss 关后，赢家开枪<br>命中 = 自己的子弹 / 6`;
+      ? `这关赢 → 你开枪<br>这关输 → <em>恶魔开枪</em><br>命中 = 实弹数 / 6`
+      : `Boss 关后赢家开枪<br>命中 = 枪里实弹 / 6<br>谁装的都算`;
   }
   function hud() {
     const run = G.run, b = G.b;
     if (!run) return;
-    $('anteLbl').textContent = `底注 ${Math.min(run.ante, CFG.antes)} / ${CFG.antes} · 第 ${run.blind + 1} 关`;
+    $('anteLbl').textContent = `底注 ${Math.min(run.ante, CFG.antes)}/${CFG.antes}`; $('stepLbl').textContent = `第 ${run.blind + 1} 关`;
     const boss = run.blind === 2;
     $('blindLbl').textContent = boss ? `Boss · ${run.boss.name}` : DL.BLIND_NAMES[run.blind];
     $('blindLbl').className = boss ? 'boss' : '';
@@ -949,7 +1008,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
       $('targetLbl').textContent = fmt(b.target);
       $('scoreNow').textContent = fmt(b.score);
       $('scoreBar').style.width = `${Math.min(100, b.score / b.target * 100)}%`;
-      $('counts').innerHTML = `<i class="c">出牌 ${b.hands}</i>　<i class="m">弃牌 ${b.discards}</i>`;
+      $('handsLbl').textContent = b.hands; $('discLbl').textContent = b.discards;
       $('deckLbl').textContent = `牌堆 ${b.deck.length}`;
     }
     $('money').textContent = `$${run.money}`;
@@ -963,19 +1022,19 @@ table.ht td:nth-child(n+2) { text-align: right; }
   function preview() {
     if (G.phase !== 'play') return;
     const sel = [...G.sel];
-    if (!sel.length) { $('calc').hidden = true; return; }
+    if (!sel.length) { $('handName').innerHTML = '选牌 · 最多 5 张'; $('handName').className = 'lbl'; $('chipsV').textContent = '-'; $('multV').textContent = '-'; $('est').textContent = ''; return; }
     const held = handNow().filter((c) => !G.sel.has(c));
     const s = DL.score(G.run, sel, held, G.b.idx === 2 ? G.b.boss : null);
-    $('calc').hidden = false; $('total').hidden = true;
+    $('handName').className = '';
     $('handName').innerHTML = `${s.name}<small>Lv.${G.run.levels[s.type]}</small>`;
     $('chipsV').textContent = fmt(s.steps[0].chips); $('multV').textContent = fmt(s.steps[0].mult);
     const need = G.b.target - G.b.score;
-    $('est').innerHTML = `预计 <b>${fmt(s.total)}</b>${s.total >= need ? '　<b>· 够过关了</b>' : `　还差 ${fmt(need)}`}`;
+    $('est').innerHTML = `预计 ${fmt(s.total)}${s.total >= need ? ' · <b>够了</b>' : ''}`;
   }
 
   let sayT = 0;
   function say(text, ms = 2600) {
-    const el = $('say'); el.textContent = text ? `「${text}」` : ''; el.style.opacity = text ? 1 : 0;
+    const el = $('say'); $('sayTxt').textContent = text || ''; el.style.opacity = text ? 1 : 0;
     clearTimeout(sayT); if (text) sayT = setTimeout(() => (el.style.opacity = 0), ms * Math.max(SPEED, 0.3));
     if (text) { dv.nod = 1; tone(140 + Math.random() * 30, 0.08, 0.05, 'sawtooth'); }
   }
@@ -1004,6 +1063,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
     devilAim: ['把头抬起来。', '别眨眼。', '轮到我了。'],
     miss: ['咔。哈哈哈哈！', '空的？可惜啊。'],
     spared: ['运气好而已。', '下一枪就没这么幸运了。'],
+    devilLoad: ['这一发……你猜？', '我装好了。是什么呢？', '嘘。'],
     revive: ['我回来了。你以为能杀死我？', '……那只是一具身体。', '我们继续。'],
   };
   const pick = (k) => LINES[k][Math.floor(Math.random() * LINES[k].length)];
@@ -1029,14 +1089,14 @@ table.ht td:nth-child(n+2) { text-align: right; }
   }
   // the cylinder swings out of the frame for loading, like a real revolver
   function swing(out) { const x0 = drum.position.x, x1 = out ? -0.07 : 0; if (!out) SFX.click(); return tween(260, (k) => { drum.position.x = x0 + (x1 - x0) * ease(k); }); }
-  function setHoles() { holeMats.forEach((m, i) => m.color.set(G.chamberOrder[i] === 'you' ? 0xffc23d : G.chamberOrder[i] === 'devil' ? 0xe0362a : 0x0a0a0a)); }
+  function setHoles() { holeMats.forEach((m, i) => { const ch = G.cham[i]; m.color.set(!ch ? 0x0a0a0a : ch.who === 'devil' && !G.reveal ? 0x6e1410 : !ch.live ? 0x8f96a3 : ch.who === 'you' ? 0xffc23d : 0xe0362a); }); }
 
   /* ═════════ run flow ═════════ */
   async function startRun() {
     A();
     G.run = DL.newRun(rng);
     G.stats = { best: 0, bestName: '', hands: 0, kills: 0, won: 0, lost: 0, shots: [], finalWin: false };
-    G.chamberOrder = []; setHoles();
+    G.cham = G.run.gun.chambers; G.reveal = false; setHoles();
     for (const o of cards3d.values()) o.dispose(); cards3d.clear();
     clearFlyers(); casings.forEach((c) => scene.remove(c)); casings.length = 0;
     dv.tfall = 0; eyeMat.color.set(0xffd23a); post.uniforms.red.value = 0; $('fade').style.opacity = 0; cam.troll = 0;
@@ -1052,7 +1112,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
     G.b = DL.startBlind(run, rng);
     G.sel.clear(); G.played = []; G.phase = 'intro'; G.busy = true;
     coinWant = COINS;
-    $('calc').hidden = true;
+    G.b.used = 0;
     hud();
     const boss = G.b.idx === 2;
     if (boss) {
@@ -1064,7 +1124,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
     await wait(1500);
     banner('');
     camHome();
-    if (boss) await hint('boss', `<b>Boss 关</b>结束后会开枪。<br>右边的左轮：<b>这关赢</b>，你装弹后开枪；<em>这关输</em>，恶魔装弹后开枪。<br>命中率 = 开枪的人自己的子弹数 / 6。`);
+    if (boss) await hint('boss', `<b>Boss 关</b>结束后会开枪：<b>这关赢</b>，你装弹后开枪；<em>这关输</em>，恶魔装弹后开枪。<br>命中率 = 枪里的实弹数 / 6，<em>你自己装的实弹也算</em>。`);
     await drawUp();
     G.phase = 'play'; G.busy = false; hud();
     if (run.ante === 1 && G.b.idx === 0) hint('play', `点手牌选 1–5 张，凑德州牌型（对子、两对、三条、顺子、同花……）。<br>分数 = <i class="c">筹码</i> × <i class="m">倍率</i>。累计到<b>目标分</b>就赢下这一关。`);
@@ -1088,7 +1148,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
     b.discards--; DL.noteDiscard(G.run);
     b.hand = b.hand.filter((c) => !G.sel.has(c)); G.sel.clear();
     sel.forEach((c, i) => setTimeout(() => trash(c, 1), i * 50));
-    SFX.card(); $('calc').hidden = true; hud(); renderJokers();
+    SFX.card(); hud(); renderJokers();
     await wait(300);
     await drawUp();
     G.busy = false; hud();
@@ -1103,9 +1163,9 @@ table.ht td:nth-child(n+2) { text-align: right; }
     const held = b.hand.filter((c) => !G.sel.has(c));
     const res = DL.score(run, played, held, b.idx === 2 ? b.boss : null);
     b.hand = held; G.sel.clear(); G.played = played;
-    b.hands--;
+    b.hands--; b.used++;
     hud(); layoutHand(); layoutPlayed(); SFX.card();
-    $('calc').hidden = false; $('total').hidden = true; $('est').textContent = '';
+    $('est').textContent = ''; $('handName').className = '';
     $('handName').innerHTML = `${res.name}<small>Lv.${run.levels[res.type]}</small>`;
     await wait(420);
     const scoringIds = new Set(res.scoring.map((c) => c.id));
@@ -1135,8 +1195,8 @@ table.ht td:nth-child(n+2) { text-align: right; }
     }
     // final total
     const total = res.total, need = b.target - b.score, frac = Math.min(1, total / b.target);
-    const tEl = $('total'); tEl.hidden = false; tEl.textContent = fmt(total); tEl.className = 'num' + (frac > 0.4 ? ' hot' : '');
-    void tEl.offsetWidth;
+    $('est').innerHTML = `= <b>${fmt(total)}</b>`;
+    popAt(new THREE.Vector3(0, 0.98, portrait ? 0.12 : -0.16), fmt(total), 'g big');
     SFX.total(frac > 0.4); shake = Math.max(shake, 0.15 + frac * 0.5);
     await wait(520);
     // the devil bleeds gold as you close in on the target
@@ -1156,7 +1216,6 @@ table.ht td:nth-child(n+2) { text-align: right; }
     bump(sEl);
     renderJokers();
     await wait(380);
-    $('calc').hidden = true;
     played.forEach((c, k) => setTimeout(() => trash(c, 1), k * 45));
     G.played = [];
     await wait(260);
@@ -1179,7 +1238,6 @@ table.ht td:nth-child(n+2) { text-align: right; }
     await wait(1500);
     banner('');
     await loadBullet(won);
-    if (!G.hints.has('load')) await hint('load', `每一关的<b>赢家</b>往左轮里装一发自己的子弹。<br><b>金弹</b> = 你的，<em>红弹</em> = 恶魔的。<br>这个底注的 Boss 关结束时，赢家开枪。`);
     if (b.idx === 2) {
       const alive = await bossShot(won);
       if (!alive) return gameOver();
@@ -1195,30 +1253,34 @@ table.ht td:nth-child(n+2) { text-align: right; }
   }
 
   async function loadBullet(won) {
-    const run = G.run, who = won ? 'you' : 'devil';
-    DL.loadBullet(run, won);
+    const run = G.run, b = G.b, who = won ? 'you' : 'devil';
     clearFlyers();
     cam.tpos.set(0.04, 1.26, 0.6); cam.tlook.copy(GUN_POSES.show.p);
     await moveGun('show', 600);
     await swing(true);
-    const bullet = new THREE.Mesh(bulletGeo, bulletMat[who]); scene.add(bullet);
+    let want;
+    if (won) want = await chooseLoad();
+    else { want = DL.devilLoadsLive(b.idx, b.score / b.target, rng); say(pick('devilLoad')); }
+    const live = DL.loadBullet(run, won, want);
+    if (won && !live) { hud(); bump($('money')); SFX.coins(3); }
+    const bullet = new THREE.Mesh(bulletGeo, won ? (live ? bulletMat.you : bulletMat.dud) : bulletMat.devil); scene.add(bullet);
     const from = who === 'you' ? new THREE.Vector3(0.1, 0.9, 0.7) : new THREE.Vector3(0.3, 1.0, -1.1);
-    const slot = G.chamberOrder.length, target = new THREE.Vector3();
+    const slot = run.gun.chambers.length - 1, target = new THREE.Vector3();
     drum.children[1 + slot].getWorldPosition(target);
     $('banner').style.top = '22%';
-    banner(won ? '<span style="font-size:.6em">你装进一发</span> <b>金弹</b>' : '<span style="font-size:.6em">恶魔装进一发</span> <em>红弹</em>', '', '');
+    banner(won ? (live ? '<span style="font-size:.55em">你装进一发</span> <b>实弹</b>' : '<span style="font-size:.55em">你装进一发</span> <i class="d">哑弹</i>') : '<span style="font-size:.55em">恶魔装进一发</span> <em>？</em>', won ? '' : '他装的是实弹还是哑弹，只有他知道', '');
     await tween(650, (k) => {
       const e = ease(k);
       bullet.position.lerpVectors(from, target, e); bullet.position.y += Math.sin(k * Math.PI) * 0.25;
       bullet.rotation.x = Math.PI / 2 * e + k * 6; bullet.rotation.z = k * 3;
     });
     scene.remove(bullet);
-    G.chamberOrder.push(who); setHoles(); SFX.load(); shake = 0.2;
+    setHoles(); SFX.load(); shake = 0.2;
     const z0 = drum.rotation.z;
     tween(380, (k) => { drum.rotation.z = z0 + ease(k) * (Math.PI / 3); });
     hud();
     const span = $('cyl').children[slot]; if (span) span.classList.add('pop');
-    $('cyl').style.transform = `rotate(${G.chamberOrder.length * 60}deg)`; setTimeout(() => ($('cyl').style.transform = ''), 500 * SPEED);
+    $('cyl').style.transform = `rotate(${run.gun.chambers.length * 60}deg)`; setTimeout(() => ($('cyl').style.transform = ''), 500 * SPEED);
     await wait(1100);
     banner(''); $('banner').style.top = '';
     await swing(false);
@@ -1230,15 +1292,17 @@ table.ht td:nth-child(n+2) { text-align: right; }
     const shot = DL.bossShot(run, won, rng);
     G.phase = 'shot';
     G.stats.shots.push(shot);
-    const youShoot = shot.shooter === 'you', n = run.gun[shot.shooter];
-    const pctTxt = `${n}/6 · ${Math.round(shot.p * 100)}%`;
+    const youShoot = shot.shooter === 'you';
+    const mine = shot.chambers.filter((c) => c.who === 'you' && c.live).length, his = shot.chambers.filter((c) => c.who === 'devil').length;
+    const range = his ? `${mine}/6 ～ ${mine + his}/6` : `${mine}/6`;
+    const odds = `你知道的实弹 ${mine} 发${his ? `，恶魔装的 ${his} 发不知虚实` : ''}<br>命中率 ${range}`;
     if (youShoot) {
-      banner('你开枪', `枪里有 <b>${n} 发金弹</b>　命中 <b>${pctTxt}</b>`, 'var(--gold)');
+      banner('你开枪', odds, 'var(--gold)');
       say(pick('youAim'));
       cam.tpos.copy(CAM_HOME.pos).add(new THREE.Vector3(0.05, -0.08, -0.25)); cam.tlook.set(0, 1.5, -1.5);
       await moveGun('mine', 800);
     } else {
-      banner('恶魔开枪', `枪里有 <em>${n} 发红弹</em>　命中 <em>${pctTxt}</em>`, 'var(--blood)');
+      banner('恶魔开枪', odds, 'var(--blood)');
       say(pick('devilAim'));
       dv.tlean = 0.25;
       await moveGun('his', 1000);
@@ -1252,6 +1316,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
     hammer.rotation.x = -0.6; SFX.click();
     await wait(youShoot ? 400 : 700);
     hammer.rotation.x = 0;
+    G.reveal = true; setHoles(); hud();
     let alive = true;
     if (shot.hit) {
       SFX.bang(); shake = 0.9; muzzle.visible = true; flashLight.position.copy(gun.position); flashLight.intensity = 7;
@@ -1260,9 +1325,10 @@ table.ht td:nth-child(n+2) { text-align: right; }
         G.stats.kills++;
         dv.tfall = 1; eyeMat.color.set(0x220a04);
         burstCoins(70, new THREE.Vector3(0, 1.2, -1.35)); setTimeout(() => SFX.coins(20), 200);
-        run.money += CFG.devilKillMoney;
+        const bounty = DL.killMoney(shot);
+        run.money += bounty;
         await wait(500);
-        banner('命中！', `恶魔倒下了。掉落 <b>$${CFG.devilKillMoney}</b> 和一件遗物`, 'var(--gold)');
+        banner('命中！', `恶魔倒下了。赏金 <b>$${bounty}</b>（$${CFG.devilKillMoney} + 实弹 ${shot.live} × $${CFG.bountyPerLive}）<br><span class="lbl">${revealTxt(shot)}</span>`, 'var(--gold)');
         bump($('money')); hud();
         await wait(1700);
         banner('');
@@ -1278,8 +1344,9 @@ table.ht td:nth-child(n+2) { text-align: right; }
       }
     } else {
       SFX.click(); muzzle.visible = false;
-      if (youShoot) { banner('咔。', '空膛。恶魔活下来了。', 'var(--dim)'); say(pick('miss')); dv.laugh = 1; SFX.laugh(); }
-      else { banner('咔。', '空膛。<b>你活下来了。</b>', 'var(--green)'); say(pick('spared')); }
+      const rv = revealTxt(shot);
+      if (youShoot) { banner('咔。', `空膛。恶魔活下来了。<br><span class="lbl">${rv}</span>`, 'var(--dim)'); say(pick('miss')); dv.laugh = 1; SFX.laugh(); }
+      else { banner('咔。', `空膛。<b>你活下来了。</b><br><span class="lbl">${rv}</span>`, 'var(--green)'); say(pick('spared')); }
       await wait(1800);
       banner('');
       dv.tlean = 0; camHome(); await moveGun('rest', 500);
@@ -1296,7 +1363,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
       $('pickSub').innerHTML = full() ? '<em>小丑槽满了</em>：先点上方你的小丑卖掉一张，再来选。' : '选一张小丑带走';
       $('pickRow').innerHTML = ids.map((id) => {
         const d = DL.JOKER_BY_ID[id];
-        return `<div class="item">${jokerCard(d)}<button class="btn gold" data-take="${id}" ${full() ? 'disabled' : ''}>带走</button></div>`;
+        return `<div class="item">${jokerCard(d)}<button class="mi" data-take="${id}" ${full() ? 'disabled' : ''}>带走</button></div>`;
       }).join('');
     };
     render();
@@ -1331,15 +1398,15 @@ table.ht td:nth-child(n+2) { text-align: right; }
   }
 
   async function ejectCasings() {
-    if (!G.chamberOrder.length) return;
+    if (!G.cham.length) { G.cham = G.run.gun.chambers; G.reveal = false; return; }
     cam.tpos.set(0.42, 1.18, 0.32); cam.tlook.copy(GUN_POSES.rest.p);
     await wait(300);
     const p = new THREE.Vector3(); drum.getWorldPosition(p);
-    G.chamberOrder.forEach((who) => {
-      const m = new THREE.Mesh(bulletGeo, bulletMat[who]); m.position.copy(p); scene.add(m);
+    G.cham.forEach((ch) => {
+      const m = new THREE.Mesh(bulletGeo, !ch.live ? bulletMat.dud : ch.who === 'you' ? bulletMat.you : bulletMat.devil); m.position.copy(p); scene.add(m);
       flyers.push({ m, v: new THREE.Vector3(rand(-0.6, 0.6), rand(0.8, 1.4), rand(0.1, 0.6)), spin: new THREE.Vector3(rand(-15, 15), rand(-15, 15), 0), rest: false });
     });
-    SFX.spin(); G.chamberOrder = []; setHoles(); hud();
+    SFX.spin(); G.cham = G.run.gun.chambers; G.reveal = false; setHoles(); hud();
     banner('新的底注', '左轮清空', 'var(--dim)');
     await wait(1100);
     banner(''); camHome();
@@ -1348,6 +1415,55 @@ table.ht td:nth-child(n+2) { text-align: right; }
     eyeMat.color.set(0xffd23a); dv.tfall = 0; eyeLight.intensity = 3;
     SFX.drone(); say(pick('revive'));
     await wait(1200);
+  }
+
+  function revealTxt(shot) {
+    const mine = shot.chambers.filter((c) => c.who === 'you'), his = shot.chambers.filter((c) => c.who === 'devil');
+    const f = (a) => a.map((c) => (c.live ? '实' : '哑')).join(' ');
+    return `你装的：${mine.length ? f(mine) : '无'}　恶魔装的：${his.length ? f(his) : '无'}`;
+  }
+
+  // the load menu: live is free, a dud costs money. Shows what you know so the choice is informed.
+  function chooseLoad() {
+    const run = G.run, b = G.b, boss = b.idx === 2;
+    if (SPEED < 0.5) return Promise.resolve(G.autoLoad ? G.autoLoad(run, b) : true);
+    const mine = run.gun.chambers.filter((c) => c.who === 'you'), his = run.gun.chambers.filter((c) => c.who === 'devil').length;
+    const gunNow = run.gun.chambers.length
+      ? `枪里现在：你的 <b>实 ${mine.filter((c) => c.live).length}</b> · <i class="d">哑 ${mine.filter((c) => !c.live).length}</i>${his ? ` · <em>恶魔的 ? × ${his}</em>` : ''}`
+      : '枪里现在是空的。';
+    let info;
+    if (boss) info = `你赢下了 Boss，装完这发就<b>由你开枪</b>。<br>${gunNow}`;
+    else {
+      const proj = DL.projectBoss(run, b.score, b.used);
+      const pct = Math.round(proj * 100);
+      info = `你赢下了${DL.BLIND_NAMES[b.idx]}。按这关的火力（平均每手 ${fmt(b.score / Math.max(1, b.used))}），这个底注的 Boss「${run.boss.name}」你大约能打到目标的 <b style="color:${pct >= 130 ? 'var(--green)' : pct >= 100 ? 'var(--gold)' : 'var(--blood)'}">${pct}%</b>。<br>${gunNow}`;
+    }
+    $('loadTtl').textContent = '装弹 · 实弹还是哑弹？';
+    $('loadInfo').innerHTML = info;
+    $('loadNote').innerHTML = boss
+      ? '实弹越多，这一枪越可能命中，赏金也越高（每发实弹 +$4）。'
+      : `Boss 关<b>谁赢谁开枪</b>，所有实弹都算。实弹：赏金 +$${CFG.bountyPerLive}，但 Boss 关输了也可能打中你自己。哑弹：花 $${CFG.dudCost} 买个保险。`;
+    const can = run.money >= CFG.dudCost;
+    $('dudBtn').disabled = !can;
+    $('dudBtn').innerHTML = `哑弹<small>${can ? '$' + CFG.dudCost : '钱不够 $' + CFG.dudCost}</small>`;
+    $('liveBtn').innerHTML = `实弹<small>免费${boss ? ' · 推荐' : ''}</small>`;
+    let cur = 0;
+    const opts = [$('liveBtn'), $('dudBtn')];
+    const mark = () => opts.forEach((o, i) => o.classList.toggle('cur', i === cur));
+    mark();
+    $('load').hidden = false;
+    return new Promise((res) => {
+      const done = (live) => { $('load').hidden = true; window.removeEventListener('keydown', key); SFX.pick(); res(live); };
+      const key = (e) => {
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { cur = cur ? 0 : can ? 1 : 0; mark(); SFX.pick(); e.preventDefault(); }
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); done(cur === 0); }
+      };
+      window.addEventListener('keydown', key);
+      $('liveBtn').onclick = () => done(true);
+      $('dudBtn').onclick = () => { if (can) done(false); };
+      $('liveBtn').onmouseenter = () => { cur = 0; mark(); };
+      $('dudBtn').onmouseenter = () => { if (can) { cur = 1; mark(); } };
+    });
   }
 
   /* ─── shop ─── */
@@ -1371,7 +1487,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
       }
       if (it.sold) card = card.replace('class="card', 'class="card sold');
       const full = it.kind === 'joker' && run.jokers.length >= CFG.jokerSlots;
-      return `<div class="item">${card}<span class="price">$${it.cost}</span><button class="btn gold" data-buy="${i}" ${it.sold || run.money < it.cost || full ? 'disabled' : ''}>${it.sold ? '已买' : full ? '槽满' : '买'}</button></div>`;
+      return `<div class="item">${card}<span class="price">$${it.cost}</span><button class="mi" data-buy="${i}" ${it.sold || run.money < it.cost || full ? 'disabled' : ''}>${it.sold ? '已买' : full ? '槽满' : '买'}</button></div>`;
     }).join('');
     const rc = CFG.rerollBase + G.rerolls;
     $('rerollBtn').textContent = `刷新 $${rc}`; $('rerollBtn').disabled = run.money < rc;
@@ -1400,7 +1516,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
     hideTip(); tipFor = id; el.classList.add('on');
     const d = DL.JOKER_BY_ID[id], canSell = G.phase === 'shop' || G.phase === 'pick';
     const tip = $('jtip'), r = el.getBoundingClientRect();
-    tip.innerHTML = `<span class="nm">${d.name}</span><span>${d.desc}</span>${canSell ? `<button class="btn disc" id="sellBtn" style="justify-self:center;font-size:15px;padding:6px 14px 8px">卖出 +$${DL.sellValue(id)}</button>` : ''}`;
+    tip.innerHTML = `<span class="nm">${d.name}</span><span>${d.desc}</span>${canSell ? `<button class="mi cur" id="sellBtn" style="justify-self:center;color:#ff8f84">卖出 +$${DL.sellValue(id)}</button>` : ''}`;
     tip.style.left = `${Math.min(innerWidth - 110, Math.max(110, r.left + r.width / 2))}px`; tip.style.top = `${r.bottom + 10}px`;
     tip.hidden = false;
     const sb = $('sellBtn');
@@ -1431,7 +1547,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
     $('hud').hidden = true; banner(''); $('say').style.opacity = 0;
     $('endTitle').textContent = '你死了'; $('endTitle').style.color = 'var(--blood)';
     const sh = G.stats.shots[G.stats.shots.length - 1];
-    $('endSub').innerHTML = `枪里有 ${sh.bullets.devil} 发红弹，命中率 ${Math.round(sh.p * 100)}%。<br>恶魔把你的筹码收进了口袋。`;
+    $('endSub').innerHTML = `枪里有 ${sh.live} 发实弹（${revealTxt(sh)}），命中率 ${sh.live}/6。<br>恶魔把你的筹码收进了口袋。`;
     endStats();
     $('end').hidden = false;
     await wait(300);
@@ -1568,6 +1684,7 @@ table.ht td:nth-child(n+2) { text-align: right; }
   }
   window.__T = {
     G, DL,
+    autoLoad(f) { G.autoLoad = f; },
     speed(s) { SPEED = s; },
     selectBest() { G.sel = new Set(bestPlay()); layoutHand(); hud(); },
     play, discard,
